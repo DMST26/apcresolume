@@ -1,0 +1,1755 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Configurador APC mini mk2 ⇄ Resolume</title>
+<style>
+:root {
+	--bg: #111214;
+	--panel: #1a1c1f;
+	--panel2: #22252a;
+	--line: #30343a;
+	--text: #e8e9eb;
+	--dim: #9aa0a8;
+	--accent: #ffb000;
+	--err: #ff5a52;
+	--warn: #ffc845;
+	--ok: #4cd06a;
+	--body: #2a2c30;
+	--pad-off: #2e3034;
+	--pad: 46px;
+	--gap: 6px;
+	color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+	background: var(--bg); color: var(--text);
+	font: 13px/1.4 "Segoe UI", system-ui, -apple-system, sans-serif;
+	display: flex; flex-direction: column;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+button {
+	background: var(--panel2); border: 1px solid var(--line); border-radius: 6px;
+	padding: 6px 10px; cursor: pointer;
+}
+button:hover { border-color: #4a5058; }
+button.primary { background: var(--accent); color: #111; border-color: var(--accent); font-weight: 600; }
+button.small { padding: 3px 7px; font-size: 12px; }
+button:disabled { opacity: .45; cursor: default; }
+input[type=text], input[type=number], select, textarea {
+	background: #0f1012; border: 1px solid var(--line); border-radius: 5px; padding: 5px 7px; width: 100%;
+}
+input[type=number] { width: 90px; }
+input:focus, select:focus, textarea:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+label.check { display: flex; gap: 6px; align-items: center; cursor: pointer; }
+h2 { font-size: 14px; margin: 0 0 10px; }
+h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--dim); margin: 16px 0 8px; }
+p { margin: 6px 0; }
+.dim { color: var(--dim); }
+.err { color: var(--err); }
+.warn { color: var(--warn); }
+.ok { color: var(--ok); }
+code { background: #0b0c0d; padding: 1px 4px; border-radius: 3px; font-size: 12px; }
+
+/* ---------- barra superior ---------- */
+header {
+	display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+	padding: 8px 14px; background: var(--panel); border-bottom: 1px solid var(--line);
+}
+header .title { font-weight: 700; margin-right: 6px; white-space: nowrap; }
+header .title span { color: var(--accent); }
+header input.mapname { width: 260px; }
+header .spacer { flex: 1; }
+
+main { flex: 1; display: flex; min-height: 0; }
+#left { flex: 1; overflow: auto; padding: 14px; min-width: 0; }
+#right {
+	width: 400px; flex-shrink: 0; background: var(--panel); border-left: 1px solid var(--line);
+	display: flex; flex-direction: column; min-height: 0;
+}
+@media (max-width: 980px) {
+	main { flex-direction: column; overflow: auto; }
+	#left { overflow: visible; }
+	#right { width: auto; border-left: 0; border-top: 1px solid var(--line); }
+	:root { --pad: 36px; --gap: 5px; }
+}
+
+/* ---------- vista previa ---------- */
+.previewbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 12px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; border-right: 1px solid var(--line); padding: 5px 9px; }
+.seg button:last-child { border-right: 0; }
+.seg button.on { background: var(--accent); color: #111; }
+
+/* ---------- el aparato ---------- */
+.device {
+	display: inline-grid; grid-template-columns: auto auto auto; gap: 10px 12px;
+	background: var(--body); padding: 16px 18px 14px; border-radius: 14px;
+	box-shadow: 0 8px 30px #0008, inset 0 1px 0 #ffffff10;
+}
+.rowlabels { display: grid; grid-template-rows: repeat(8, var(--pad)); gap: var(--gap); }
+.rowlabels div { display: flex; align-items: center; gap: 4px; color: var(--dim); font-size: 11px; }
+.rowlabels button { padding: 0 5px; font-size: 11px; line-height: 18px; }
+.grid { display: grid; grid-template-columns: repeat(8, var(--pad)); grid-template-rows: repeat(8, var(--pad)); gap: var(--gap); }
+.pad {
+	position: relative; border-radius: 4px; background: var(--pad-off); cursor: pointer;
+	border: 1px solid #00000060; overflow: hidden;
+}
+.pad .led, .btn .led { position: absolute; inset: 0; border-radius: inherit; }
+.pad .lbl {
+	position: absolute; left: 2px; right: 2px; bottom: 2px; font-size: 8.5px; line-height: 1.05;
+	color: #fff; text-shadow: 0 0 3px #000, 0 0 2px #000; pointer-events: none;
+	display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.pad .ico { position: absolute; top: 2px; left: 3px; font-size: 9px; font-weight: 700; color: #fff; text-shadow: 0 0 3px #000; pointer-events: none; }
+.pad .badge { position: absolute; top: 1px; right: 2px; font-size: 10px; pointer-events: none; text-shadow: 0 0 3px #000; }
+.sel { outline: 2px solid var(--accent); outline-offset: 2px; z-index: 1; }
+.side { display: grid; grid-template-rows: repeat(8, var(--pad)); gap: var(--gap); align-items: center; }
+.btn {
+	position: relative; width: calc(var(--pad) * .62); height: calc(var(--pad) * .34);
+	background: #3a3c41; border-radius: 3px; cursor: pointer; border: 1px solid #0007;
+}
+.btn .blbl { position: absolute; left: calc(100% + 6px); top: 50%; transform: translateY(-50%); white-space: nowrap; font-size: 10px; color: var(--dim); pointer-events: none; }
+.bottomrow { grid-column: 2; display: grid; grid-template-columns: repeat(8, var(--pad)); gap: var(--gap); justify-items: center; }
+.bottomrow .btn .blbl { left: 50%; top: calc(100% + 3px); transform: translateX(-50%); max-width: calc(var(--pad) + var(--gap)); overflow: hidden; text-overflow: ellipsis; font-size: 9px; }
+.faders { grid-column: 2 / span 2; display: grid; grid-template-columns: repeat(8, var(--pad)) auto; gap: var(--gap); margin-top: 14px; }
+.fader { display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; padding: 4px 0; border-radius: 6px; }
+.fader .track { width: 6px; height: 74px; background: #0c0d0e; border-radius: 3px; position: relative; }
+.fader .knob { position: absolute; left: 50%; top: 40%; width: 26px; height: 12px; transform: translateX(-50%); background: #d6d7da; border-radius: 2px; box-shadow: 0 2px 4px #0009; }
+.fader .flbl { font-size: 9px; color: var(--dim); text-align: center; line-height: 1.1; height: 22px; overflow: hidden; width: calc(var(--pad) + 4px); }
+.fader .fnum { font-size: 10px; color: var(--dim); }
+.fader.none .knob { background: #6b6e74; }
+.shiftbox { grid-column: 3; grid-row: 2; display: flex; flex-direction: column; justify-content: flex-start; gap: 4px; align-items: flex-start; }
+.brand { grid-column: 1 / span 3; display: flex; justify-content: space-between; color: #8c9097; font-size: 11px; letter-spacing: .08em; }
+
+/* LEDs: brillo y animaciones (la duración la pone el script según el BPM) */
+@keyframes pulse { 0%, 100% { opacity: .12; } 50% { opacity: 1; } }
+@keyframes blink { 0%, 49.9% { opacity: 1; } 50%, 100% { opacity: 0; } }
+.led.pulse { animation-name: pulse; animation-timing-function: ease-in-out; animation-iteration-count: infinite; }
+.led.blink { animation-name: blink; animation-timing-function: linear; animation-iteration-count: infinite; }
+
+/* ---------- avisos ---------- */
+#warnings { margin-top: 16px; max-width: 760px; }
+#warnings .item { display: flex; gap: 8px; align-items: baseline; padding: 5px 8px; border-radius: 5px; background: var(--panel); margin-bottom: 4px; }
+#warnings .item .msg { flex: 1; }
+#warnings .item button { flex-shrink: 0; }
+
+/* ---------- panel derecho ---------- */
+.tabs { display: flex; border-bottom: 1px solid var(--line); flex-shrink: 0; overflow-x: auto; }
+.tabs button { border: 0; border-radius: 0; background: none; padding: 10px 12px; color: var(--dim); border-bottom: 2px solid transparent; white-space: nowrap; }
+.tabs button.on { color: var(--text); border-bottom-color: var(--accent); }
+.tabpane { flex: 1; overflow: auto; padding: 14px; display: none; }
+.tabpane.on { display: block; }
+.field { margin-bottom: 10px; }
+.field > label { display: block; color: var(--dim); font-size: 12px; margin-bottom: 3px; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.row > * { flex: 1; min-width: 0; }
+.row > .fixed { flex: 0 0 auto; }
+.hint { font-size: 12px; color: var(--dim); margin-top: 3px; }
+.box { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 10px; margin-bottom: 10px; }
+.namecheck { font-size: 12px; margin-top: 4px; }
+
+.palette { display: grid; grid-template-columns: repeat(16, 1fr); gap: 2px; }
+.palette div { aspect-ratio: 1; border-radius: 2px; cursor: pointer; border: 1px solid #0006; }
+.palette div.on { outline: 2px solid #fff; outline-offset: 1px; z-index: 1; position: relative; }
+.quick { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 6px; }
+.quick div { width: 26px; height: 26px; border-radius: 4px; cursor: pointer; border: 1px solid #0006; position: relative; }
+.quick div.on { outline: 2px solid #fff; outline-offset: 1px; }
+.quick div span { position: absolute; bottom: -1px; right: 1px; font-size: 8px; color: #000a; font-weight: 700; }
+
+.ledstate { display: grid; grid-template-columns: 110px 1fr 34px; gap: 8px; align-items: center; margin-bottom: 6px; }
+.ledstate .sw { width: 34px; height: 24px; border-radius: 4px; background: var(--pad-off); position: relative; overflow: hidden; }
+
+dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 18px; width: min(460px, 94vw); }
+dialog::backdrop { background: #000a; }
+.toast {
+	position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: #2b2e33; border: 1px solid var(--line);
+	padding: 9px 14px; border-radius: 8px; box-shadow: 0 6px 20px #000a; z-index: 10; max-width: 90vw;
+}
+.toast.err { border-color: var(--err); }
+.help li { margin-bottom: 6px; }
+</style>
+</head>
+<body>
+<header>
+	<div class="title">APC mini mk2 <span>⇄</span> Resolume</div>
+	<input class="mapname" id="mapName" type="text" title="Nombre del mapa (club o evento)">
+	<button id="btnOpen" title="Abrir un mapa guardado (.json)">Abrir mapa…</button>
+	<button id="btnSave" title="Descargar el mapa como .json">Guardar mapa</button>
+	<button id="btnUndo" title="Deshacer (Ctrl+Z)">↶</button>
+	<button id="btnRedo" title="Rehacer (Ctrl+Y)">↷</button>
+	<span class="spacer"></span>
+	<button class="primary" id="btnExport">Exportar para Chataigne</button>
+	<input type="file" id="fileOpen" accept=".json,application/json" hidden>
+	<input type="file" id="fileComp" accept=".json,application/json" hidden>
+</header>
+<main>
+	<section id="left">
+		<div class="previewbar">
+			<span class="dim">Vista previa:</span>
+			<div class="seg" id="previewSeg">
+				<button data-mode="empty">Vacíos</button>
+				<button data-mode="loaded">Cargados</button>
+				<button data-mode="active">Sonando</button>
+				<button data-mode="mixed">Mezcla</button>
+				<button data-mode="show">Simular show</button>
+			</div>
+			<label class="row fixed" style="gap:6px">BPM <input type="number" id="bpm" min="40" max="300" step="1" style="width:70px"></label>
+			<span class="dim" style="font-size:12px">Clic: elegir · Ctrl/Mayús + clic: elegir varios</span>
+		</div>
+		<div class="device" id="device"></div>
+		<div id="warnings"></div>
+	</section>
+	<aside id="right">
+		<nav class="tabs" id="tabs">
+			<button data-tab="ctl" class="on">Control</button>
+			<button data-tab="res">Resolume</button>
+			<button data-tab="opt">Opciones</button>
+			<button data-tab="exp">Exportar</button>
+			<button data-tab="help">Ayuda</button>
+		</nav>
+		<div class="tabpane on" id="tab-ctl"></div>
+		<div class="tabpane" id="tab-res"></div>
+		<div class="tabpane" id="tab-opt"></div>
+		<div class="tabpane" id="tab-exp"></div>
+		<div class="tabpane help" id="tab-help"></div>
+	</aside>
+</main>
+
+<dialog id="tplDialog"></dialog>
+
+<script>// Generador compartido por configurador.html (navegador) y build.js (Node):
+// normaliza y valida el mapa, genera los scripts de Chataigne, el .noisette y el ZIP.
+(function (G) {
+	"use strict";
+
+	G.PAD_TYPES = ["none", "clip", "dual", "osc", "midi", "rgb", "tap", "resync", "bypass", "blackout", "clear", "clearAll", "prev", "next", "refresh"];
+	G.BUTTON_TYPES = ["none", "bypass", "clear", "blackout", "clearAll", "prev", "next", "refresh", "tap", "resync", "osc", "midi"];
+	G.FADER_TYPES = ["none", "layerOpacity", "layerMaster", "compMaster", "compOpacity", "osc", "midiCC", "clipSpeed"];
+	G.MAX_EXTRA = 4;
+	// nombres de módulo que ya usa el puente y no pueden ser destinos nuevos
+	G.RESERVED_TARGETS = ["apc", "resolume", "resolumeapi", "resolumews"];
+	G.CONFIG_MARKER = "var EMBEDDED_CONFIG = null; // @@CONFIG@@";
+	G.SCRIPT_NAMES = ["apc_to_resolume.js", "resolume_to_apc.js", "resolume_api.js"];
+
+	function int(v, def, min, max) {
+		var n = parseInt(v, 10);
+		if (isNaN(n)) n = def;
+		if (min !== undefined && n < min) n = min;
+		if (max !== undefined && n > max) n = max;
+		return n;
+	}
+	function num(v, def) {
+		var n = parseFloat(v);
+		return isNaN(n) ? def : n;
+	}
+	function layerList(v, fallback) {
+		var arr = Array.isArray(v) ? v : String(v === undefined ? "" : v).split(",");
+		var out = [];
+		arr.forEach(function (x) { var n = parseInt(x, 10); if (n > 0 && out.indexOf(n) < 0) out.push(n); });
+		if (!out.length && fallback) out.push(fallback);
+		return out;
+	}
+	G.layerList = layerList;
+
+	function normPadLed(led) {
+		led = led || {};
+		return { empty: int(led.empty, 0, 0, 16), loaded: int(led.loaded, 0, 0, 16), active: int(led.active, 0, 0, 16) };
+	}
+	function normButtonLed(led) {
+		led = led || {};
+		return { idle: int(led.idle, 0, 0, 2), active: int(led.active, 1, 0, 2) };
+	}
+
+	// Deja cada control con todos los campos que leen los scripts (y solo esos).
+	function normControl(d, isPad) {
+		d = d || {};
+		var types = isPad ? G.PAD_TYPES : G.BUTTON_TYPES;
+		var t = types.indexOf(d.type) >= 0 ? d.type : "none";
+		var o = { type: t, label: String(d.label || "") };
+		if (t == "clip" || t == "dual") {
+			o.layer = int(d.layer, 1, 1); o.clip = int(d.clip, 1, 1); o.name = String(d.name || "");
+		}
+		if (t == "dual") {
+			o.layer2 = int(d.layer2, 1, 1); o.clip2 = int(d.clip2, 1, 1); o.name2 = String(d.name2 || "");
+		}
+		if (t == "rgb") o.rgb = ["r", "g", "b"].indexOf(d.rgb) >= 0 ? d.rgb : "r";
+		if (t == "osc" || t == "midi") copyAction(o, d, t);
+		if (d.extra && d.extra.length) {
+			o.extra = [];
+			d.extra.slice(0, G.MAX_EXTRA).forEach(function (a) {
+				var x = { type: a.type == "midi" ? "midi" : "osc" };
+				copyAction(x, a, x.type);
+				o.extra.push(x);
+			});
+		}
+		if (t == "bypass" || t == "clear") o.layers = layerList(d.layers, 1);
+		if (t == "prev" || t == "next") o.layer = int(d.layer, 1, 1);
+		if (isPad) {
+			o.color = int(d.color, 0, 0, 127);
+			o.led = normPadLed(d.led);
+		} else {
+			o.led = normButtonLed(d.led);
+		}
+		return o;
+	}
+
+	// Campos de una acción OSC o MIDI (la principal de un control o una extra).
+	function copyAction(o, d, t) {
+		o.target = String(d.target || (t == "osc" ? "resolume" : ""));
+		o.mode = ["pulse", "hold", "toggle"].indexOf(d.mode) >= 0 ? d.mode : "pulse";
+		if (t == "osc") {
+			o.address = String(d.address || "/");
+			o.value = num(d.value, 1);
+		} else {
+			o.msg = ["note", "cc", "pc"].indexOf(d.msg) >= 0 ? d.msg : "note";
+			o.channel = int(d.channel, 1, 1, 16);
+			o.number = int(d.number, 0, 0, 127);
+			o.value = int(d.value, 127, 0, 127);
+		}
+	}
+
+	function normTarget(t) {
+		t = t || {};
+		var o = {
+			id: String(t.id || "").toLowerCase().split("").filter(function (ch) { return /[a-z0-9]/.test(ch); }).join(""),
+			type: t.type == "osc" ? "osc" : "midi",
+			label: String(t.label || "")
+		};
+		if (o.type == "osc") { o.host = String(t.host || "127.0.0.1"); o.port = int(t.port, 8000, 1, 65535); }
+		else o.device = String(t.device || "");
+		return o;
+	}
+
+	function normFader(f) {
+		f = f || {};
+		var t = G.FADER_TYPES.indexOf(f.type) >= 0 ? f.type : "none";
+		var o = { type: t, label: String(f.label || "") };
+		if (t == "layerOpacity" || t == "layerMaster" || t == "clipSpeed") o.layer = int(f.layer, 1, 1);
+		if (t == "clipSpeed") {
+			o.clip = int(f.clip, 1, 1);
+			o.min = num(f.min, 0.25); o.max = num(f.max, 4);
+			if (o.min <= 0) o.min = 0.25;
+			if (o.max <= 0) o.max = 4;
+			o.name = String(f.name || "");
+		}
+		if (t == "osc") { o.target = String(f.target || "resolume"); o.address = String(f.address || "/"); o.min = num(f.min, 0); o.max = num(f.max, 1); }
+		if (t == "midiCC") {
+			o.target = String(f.target || ""); o.channel = int(f.channel, 1, 1, 16); o.number = int(f.number, 0, 0, 127);
+			o.min = int(f.min, 0, 0, 127); o.max = int(f.max, 127, 0, 127);
+		}
+		return o;
+	}
+
+	G.normalizeConfig = function (c) {
+		c = c || {};
+		var i, out = {
+			format: "apc-resolume",
+			version: 1,
+			name: String(c.name || "Sin nombre"),
+			resolume: {
+				host: String((c.resolume && c.resolume.host) || "127.0.0.1"),
+				apiPort: int(c.resolume && c.resolume.apiPort, 8080, 1, 65535)
+			},
+			layers: {},
+			targets: [],
+			pads: [], bottom: [], side: [],
+			shift: null, faders: [],
+			options: {}
+		};
+		var L = c.layers || {};
+		Object.keys(L).forEach(function (k) { if (parseInt(k, 10) > 0 && L[k]) out.layers[String(parseInt(k, 10))] = String(L[k]); });
+		(c.targets || []).forEach(function (t) {
+			var n = normTarget(t);
+			if (n.id && G.RESERVED_TARGETS.indexOf(n.id) < 0 && !out.targets.some(function (x) { return x.id == n.id; })) out.targets.push(n);
+		});
+		for (i = 0; i < 64; i++) out.pads.push(normControl(c.pads && c.pads[i], true));
+		for (i = 0; i < 8; i++) out.bottom.push(normControl(c.bottom && c.bottom[i], false));
+		for (i = 0; i < 8; i++) out.side.push(normControl(c.side && c.side[i], false));
+		out.shift = normControl(c.shift, false);
+		for (i = 0; i < 9; i++) out.faders.push(normFader(c.faders && c.faders[i]));
+		var op = c.options || {};
+		out.options = {
+			tempoSync: op.tempoSync !== false,
+			pollHz: num(op.pollHz, 1),
+			repaintEvery: int(op.repaintEvery, 5, 1),
+			rgbHz: num(op.rgbHz, 5),
+			speedMethod: op.speedMethod == "websocket" ? "websocket" : "put",
+			autoReload: op.autoReload !== false,
+			debug: !!op.debug
+		};
+		if (out.options.pollHz <= 0) out.options.pollHz = 1;
+		if (out.options.rgbHz <= 0) out.options.rgbHz = 5;
+		return out;
+	};
+
+	// Avisos para el usuario: [{level: "error"|"aviso", msg, ref}]
+	G.validateConfig = function (c, composition) {
+		var res = [];
+		function add(level, msg, ref) { res.push({ level: level, msg: msg, ref: ref }); }
+		function oscOk(a) { return typeof a == "string" && a.charAt(0) == "/" && a.length > 1 && a.indexOf(" ") < 0; }
+		var ids = ["resolume"].concat(c.targets.map(function (t) { return t.id; }));
+		function checkAction(a, where, ref) {
+			if (!a || (a.type != "osc" && a.type != "midi")) return;
+			if (a.type == "osc" && !oscOk(a.address)) add("error", where + ": la dirección OSC tiene que empezar por / y no llevar espacios", ref);
+			if (a.type == "midi" && !a.target) add("error", where + ": falta elegir el destino MIDI", ref);
+			else if (ids.indexOf(a.target) < 0) add("error", where + ": el destino «" + a.target + "» no existe (pestaña Destinos)", ref);
+			else if (a.type == "midi" && targetType(a.target) != "midi") add("error", where + ": «" + a.target + "» es un destino OSC, no MIDI", ref);
+			else if (a.type == "osc" && a.target != "resolume" && targetType(a.target) != "osc") add("error", where + ": «" + a.target + "» es un destino MIDI, no OSC", ref);
+		}
+		function targetType(id) { for (var i = 0; i < c.targets.length; i++) if (c.targets[i].id == id) return c.targets[i].type; return id == "resolume" ? "osc" : ""; }
+		function checkControl(d, where, ref) {
+			checkAction(d, where, ref);
+			(d.extra || []).forEach(function (a, k) { checkAction(a, where + " (extra " + (k + 1) + ")", ref); });
+		}
+		c.pads.forEach(function (d, i) { checkControl(d, G.padName(i), { pad: i }); });
+		[["bottom", "Botón de abajo "], ["side", "Botón lateral "]].forEach(function (g) {
+			c[g[0]].forEach(function (d, i) { checkControl(d, g[1] + (i + 1), { group: g[0], index: i }); });
+		});
+		checkControl(c.shift, "Shift", { group: "shift", index: 0 });
+		c.faders.forEach(function (f, i) {
+			if (f.type == "osc" || f.type == "midiCC") checkAction({ type: f.type == "osc" ? "osc" : "midi", target: f.target, address: f.address }, "Fader " + (i + 1), { fader: i });
+		});
+		var seen = {};
+		c.pads.forEach(function (d, i) {
+			var where = G.padName(i);
+			if ((d.type == "clip" || d.type == "dual")) {
+				var k = d.layer + "/" + d.clip;
+				if (seen[k] !== undefined) add("aviso", where + " lanza el mismo clip que " + G.padName(seen[k]) + " (capa " + d.layer + ", clip " + d.clip + ")", { pad: i });
+				else seen[k] = i;
+			}
+		});
+		c.faders.forEach(function (f, i) {
+			if (f.type == "clipSpeed" && f.min >= f.max) add("error", "Fader " + (i + 1) + ": la velocidad mínima tiene que ser menor que la máxima", { fader: i });
+		});
+		if (composition) G.checkNames(c, composition).forEach(function (r) { res.push(r); });
+		return res;
+	};
+
+	G.padName = function (i) { return "Pad fila " + (Math.floor(i / 8) + 1) + " · " + ((i % 8) + 1); };
+
+	// ---------- composición de Resolume ----------
+
+	// Convierte la respuesta de /api/v1/composition en {layers: [{name, clips: [{name, empty}]}], name}
+	G.parseComposition = function (json) {
+		if (!json || !Array.isArray(json.layers)) throw new Error("No parece una composición de Resolume (falta \"layers\")");
+		function val(x) { return x && typeof x == "object" ? (x.value !== undefined ? x.value : "") : (x || ""); }
+		return {
+			name: String(val(json.name)),
+			layers: json.layers.map(function (l) {
+				return {
+					name: String(val(l.name)),
+					clips: (l.clips || []).map(function (cl) {
+						var conn = String(val(cl.connected));
+						var empty = conn == "Empty" || (!cl.video && !cl.audio && conn === "");
+						return { name: empty ? "" : String(val(cl.name)), empty: empty };
+					})
+				};
+			})
+		};
+	};
+
+	G.clipInfo = function (comp, layer, clip) {
+		var l = comp && comp.layers[layer - 1];
+		if (!l) return null;
+		var cl = l.clips[clip - 1];
+		return cl ? { layerName: l.name, name: cl.name, empty: cl.empty } : { layerName: l.name, missing: true };
+	};
+
+	// Busca el clip por nombre en la capa: devuelve su número o 0.
+	G.findClip = function (comp, layer, name) {
+		var l = comp && comp.layers[layer - 1];
+		if (!l || !name) return 0;
+		for (var i = 0; i < l.clips.length; i++) if (l.clips[i].name == name) return i + 1;
+		return 0;
+	};
+
+	// Compara los nombres guardados en el mapa con los de la composición.
+	G.checkNames = function (c, comp) {
+		var res = [];
+		function one(where, ref, layer, clip, saved, which) {
+			var info = G.clipInfo(comp, layer, clip);
+			if (!info) { res.push({ level: "error", msg: where + ": la capa " + layer + " no existe en la composición", ref: ref, kind: "layer" }); return; }
+			if (info.missing) { res.push({ level: "error", msg: where + ": la capa " + layer + " no tiene clip " + clip, ref: ref, kind: "clip" }); return; }
+			if (!saved) {
+				if (info.empty) res.push({ level: "aviso", msg: where + ": el clip " + clip + " de la capa " + layer + " está vacío", ref: ref, kind: "empty" });
+				return;
+			}
+			if (info.name == saved) return;
+			var found = G.findClip(comp, layer, saved);
+			res.push({
+				level: "error",
+				msg: where + ": esperaba «" + saved + "» en capa " + layer + " clip " + clip + ", pero ahí está " + (info.empty ? "un clip vacío" : "«" + info.name + "»") +
+					(found ? ". Ahora está en el clip " + found : ". No está en esa capa"),
+				ref: ref, kind: "name", which: which, moveTo: found
+			});
+		}
+		c.pads.forEach(function (d, i) {
+			if (d.type != "clip" && d.type != "dual") return;
+			one(G.padName(i), { pad: i }, d.layer, d.clip, d.name, 1);
+			if (d.type == "dual") one(G.padName(i) + " (2.º clip)", { pad: i }, d.layer2, d.clip2, d.name2, 2);
+		});
+		c.faders.forEach(function (f, i) {
+			if (f.type == "clipSpeed") one("Fader " + (i + 1), { fader: i }, f.layer, f.clip, f.name, 1);
+		});
+		return res;
+	};
+
+	// ---------- exportar ----------
+
+	G.configJSON = function (c) { return JSON.stringify(c, null, 1) + "\n"; };
+
+	G.buildScript = function (template, c) {
+		if (template.indexOf(G.CONFIG_MARKER) < 0) throw new Error("La plantilla del script no tiene la marca del mapa");
+		var json = JSON.stringify(c);
+		return template.replace(G.CONFIG_MARKER, function () {
+			return "var EMBEDDED_CONFIG = " + json + "; // mapa incluido: \"" + c.name.split("\"").join("'") + "\"";
+		});
+	};
+
+	// .noisette a partir del que ya funciona: cambia la ruta de los scripts y añade el módulo
+	// WebSocket "resolumews" si no está. Todo lo demás se deja tal cual.
+	G.buildNoisette = function (template, folder, targets) {
+		var n = JSON.parse(JSON.stringify(template));
+		folder = String(folder || "").split("\\").join("/").replace(/\/+$/, "");
+		var SCRIPT_OF = { apc: "apc_to_resolume", resolume: "resolume_to_apc", resolumeapi: "resolume_api" };
+		var hasWs = false;
+		n.modules.items.forEach(function (m) {
+			if (m.niceName == "resolumews") hasWs = true;
+			var s = SCRIPT_OF[m.niceName];
+			if (!s || !m.scripts || !m.scripts.items) return;
+			m.scripts.items.forEach(function (it) {
+				if (it.niceName != s) return;
+				it.parameters.forEach(function (p) { if (p.controlAddress == "/filePath") p.value = folder + "/" + s + ".js"; });
+			});
+		});
+		if (!hasWs) n.modules.items.push(G.WS_MODULE());
+		(targets || []).forEach(function (t, i) {
+			if (n.modules.items.some(function (m) { return m.niceName == t.id; })) return;
+			n.modules.items.push(t.type == "osc" ? G.OSC_TARGET_MODULE(t, 9100 + i) : G.MIDI_TARGET_MODULE(t));
+		});
+		return JSON.stringify(n);
+	};
+
+	// Módulo MIDI de un destino. El puerto se elige en Chataigne (los ids de Windows no se pueden adivinar).
+	G.MIDI_TARGET_MODULE = function (t) {
+		return {
+			parameters: [{ value: true, controlAddress: "/enabled" }],
+			niceName: t.id,
+			type: "MIDI",
+			params: { parameters: [{ value: false, controlAddress: "/autoAdd" }], containers: { pass_through: {} } },
+			templates: { viewOffset: [0, 0], viewZoom: 1.0 },
+			values: {}
+		};
+	};
+
+	G.OSC_TARGET_MODULE = function (t, listenPort) {
+		return {
+			parameters: [{ value: true, controlAddress: "/enabled" }],
+			niceName: t.id,
+			type: "OSC",
+			params: {
+				parameters: [{ value: "Auto", controlAddress: "/networkInterface" }],
+				containers: {
+					oscInput: { parameters: [{ value: listenPort, hexMode: false, controlAddress: "/localPort" }] },
+					oscOutputs: {
+						items: [{
+							parameters: [
+								{ value: t.host, controlAddress: "/remoteHost" },
+								{ value: t.port, hexMode: false, controlAddress: "/remotePort" }
+							],
+							niceName: "OSC Output", type: "BaseItem"
+						}],
+						viewOffset: [0, 0], viewZoom: 1.0
+					},
+					pass_through: {}
+				}
+			},
+			templates: { viewOffset: [0, 0], viewZoom: 1.0 },
+			values: {}
+		};
+	};
+
+	G.WS_MODULE = function () {
+		return {
+			parameters: [{ value: true, controlAddress: "/enabled" }],
+			niceName: "resolumews",
+			type: "WebSocket Client",
+			params: {
+				parameters: [
+					{ value: "Direct", controlAddress: "/protocol" },
+					{ value: false, controlAddress: "/autoAdd" },
+					{ value: "127.0.0.1:8080/api/v1", controlAddress: "/serverPath" }
+				]
+			},
+			templates: { viewOffset: [0, 0], viewZoom: 1.0 },
+			values: {}
+		};
+	};
+
+	// Todos los archivos que van a la carpeta de Chataigne: [{name, text}]
+	G.buildFiles = function (c, templates, noisetteTemplate, opts) {
+		opts = opts || {};
+		var files = [{ name: "apc_config.json", text: G.configJSON(c) }];
+		if (opts.scripts !== false) G.SCRIPT_NAMES.forEach(function (n) { files.push({ name: n, text: G.buildScript(templates[n], c) }); });
+		if (opts.noisette && noisetteTemplate) files.push({ name: "APC_Resolume.noisette", text: G.buildNoisette(noisetteTemplate, opts.folder, c.targets) });
+		return files;
+	};
+
+	// ZIP sin compresión (suficiente para unos pocos archivos de texto)
+	var CRC_TABLE = null;
+	function crc32(bytes) {
+		if (!CRC_TABLE) {
+			CRC_TABLE = [];
+			for (var n = 0; n < 256; n++) {
+				var c = n;
+				for (var k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+				CRC_TABLE[n] = c >>> 0;
+			}
+		}
+		var crc = 0xFFFFFFFF;
+		for (var i = 0; i < bytes.length; i++) crc = CRC_TABLE[(crc ^ bytes[i]) & 0xFF] ^ (crc >>> 8);
+		return (crc ^ 0xFFFFFFFF) >>> 0;
+	}
+	function utf8(s) {
+		if (typeof TextEncoder != "undefined") return new TextEncoder().encode(s);
+		return new Uint8Array(Buffer.from(s, "utf8"));
+	}
+	G.makeZip = function (files) {
+		var parts = [], central = [], offset = 0;
+		var d = new Date();
+		var time = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1);
+		var date = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+		function hdr(size) { return { b: new Uint8Array(size), v: null }; }
+		files.forEach(function (f) {
+			var name = utf8(f.name), data = utf8(f.text), crc = crc32(data);
+			var h = hdr(30 + name.length), v = new DataView(h.b.buffer);
+			v.setUint32(0, 0x04034b50, true); v.setUint16(4, 20, true); v.setUint16(6, 0x0800, true);
+			v.setUint16(8, 0, true); v.setUint16(10, time, true); v.setUint16(12, date, true);
+			v.setUint32(14, crc, true); v.setUint32(18, data.length, true); v.setUint32(22, data.length, true);
+			v.setUint16(26, name.length, true); v.setUint16(28, 0, true);
+			h.b.set(name, 30);
+			var ch = hdr(46 + name.length), cv = new DataView(ch.b.buffer);
+			cv.setUint32(0, 0x02014b50, true); cv.setUint16(4, 20, true); cv.setUint16(6, 20, true);
+			cv.setUint16(8, 0x0800, true); cv.setUint16(10, 0, true); cv.setUint16(12, time, true); cv.setUint16(14, date, true);
+			cv.setUint32(16, crc, true); cv.setUint32(20, data.length, true); cv.setUint32(24, data.length, true);
+			cv.setUint16(28, name.length, true); cv.setUint32(42, offset, true);
+			ch.b.set(name, 46);
+			parts.push(h.b, data); central.push(ch.b);
+			offset += h.b.length + data.length;
+		});
+		var csize = central.reduce(function (a, b) { return a + b.length; }, 0);
+		var end = new Uint8Array(22), ev = new DataView(end.buffer);
+		ev.setUint32(0, 0x06054b50, true); ev.setUint16(8, files.length, true); ev.setUint16(10, files.length, true);
+		ev.setUint32(12, csize, true); ev.setUint32(16, offset, true);
+		var all = parts.concat(central, [end]);
+		var total = all.reduce(function (a, b) { return a + b.length; }, 0);
+		var out = new Uint8Array(total), pos = 0;
+		all.forEach(function (b) { out.set(b, pos); pos += b.length; });
+		return out;
+	};
+
+})(typeof module != "undefined" && module.exports ? module.exports : (window.APCGen = {}));
+</script>
+<script>window.APP_DATA = {"defaultConfig":{"format":"apc-resolume","version":1,"name":"Deseo54 - DMST DESEO 54 PLANTILLAS","resolume":{"host":"127.0.0.1","apiPort":8080},"layers":{"1":"Visuales","2":"Strobos","3":"Outline","4":"pxel","5":"madrix"},"targets":[],"pads":[{"type":"rgb","label":"Rojo (R) del clip seleccionado","rgb":"r","color":5,"led":{"empty":1,"loaded":14,"active":7}},{"type":"rgb","label":"Verde (G) del clip seleccionado","rgb":"g","color":21,"led":{"empty":1,"loaded":14,"active":7}},{"type":"rgb","label":"Azul (B) del clip seleccionado","rgb":"b","color":45,"led":{"empty":1,"loaded":14,"active":7}},{"type":"none","label":"","color":0,"led":{"empty":0,"loaded":0,"active":0}},{"type":"clip","label":"Strobe negro","layer":2,"clip":17,"name":"","color":3,"led":{"empty":0,"loaded":3,"active":13}},{"type":"none","label":"","color":0,"led":{"empty":0,"loaded":0,"active":0}},{"type":"resync","label":"Resync","color":5,"led":{"empty":0,"loaded":7,"active":7}},{"type":"tap","label":"Tap tempo","color":9,"led":{"empty":0,"loaded":15,"active":15}},{"type":"clip","label":"Outline 9","layer":3,"clip":9,"name":"","color":57,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 10","layer":3,"clip":10,"name":"","color":3,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 11","layer":3,"clip":11,"name":"","color":57,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 12","layer":3,"clip":12,"name":"","color":57,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 13","layer":3,"clip":13,"name":"","color":3,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 14","layer":3,"clip":14,"name":"","color":57,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 15","layer":3,"clip":15,"name":"","color":57,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 16","layer":3,"clip":16,"name":"","color":57,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 1","layer":3,"clip":1,"name":"","color":57,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 2","layer":3,"clip":2,"name":"","color":57,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 3","layer":3,"clip":3,"name":"","color":57,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 4","layer":3,"clip":4,"name":"","color":57,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 5","layer":3,"clip":5,"name":"","color":57,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 6","layer":3,"clip":6,"name":"","color":57,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 7","layer":3,"clip":7,"name":"","color":57,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 8","layer":3,"clip":8,"name":"","color":57,"led":{"empty":0,"loaded":7,"active":15}},{"type":"dual","label":"B07 barrido lento","layer":4,"clip":9,"name":"","layer2":5,"clip2":8,"name2":"","color":37,"led":{"empty":0,"loaded":7,"active":15}},{"type":"dual","label":"B11 anillos","layer":4,"clip":13,"name":"","layer2":5,"clip2":12,"name2":"","color":37,"led":{"empty":0,"loaded":7,"active":15}},{"type":"dual","label":"B08 barrido rápido","layer":4,"clip":10,"name":"","layer2":5,"clip2":9,"name2":"","color":37,"led":{"empty":0,"loaded":7,"active":15}},{"type":"dual","label":"B13 destellos","layer":4,"clip":11,"name":"","layer2":5,"clip2":14,"name2":"","color":37,"led":{"empty":0,"loaded":7,"active":15}},{"type":"dual","label":"B01 negras (completo)","layer":4,"clip":3,"name":"","layer2":5,"clip2":2,"name2":"","color":13,"led":{"empty":0,"loaded":7,"active":15}},{"type":"dual","label":"B06 alterno","layer":4,"clip":8,"name":"","layer2":5,"clip2":7,"name2":"","color":5,"led":{"empty":0,"loaded":7,"active":15}},{"type":"dual","label":"B04 random","layer":4,"clip":6,"name":"","layer2":5,"clip2":5,"name2":"","color":13,"led":{"empty":0,"loaded":7,"active":15}},{"type":"dual","label":"B05 random rápido","layer":4,"clip":7,"name":"","layer2":5,"clip2":6,"name2":"","color":13,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 9","layer":1,"clip":9,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 10","layer":1,"clip":10,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 11","layer":1,"clip":11,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 12","layer":1,"clip":12,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 13","layer":1,"clip":13,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 14","layer":1,"clip":14,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 15","layer":1,"clip":15,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 16","layer":1,"clip":16,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 1","layer":1,"clip":1,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 2","layer":1,"clip":2,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 3","layer":1,"clip":3,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 4","layer":1,"clip":4,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 5","layer":1,"clip":5,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 6","layer":1,"clip":6,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 7","layer":1,"clip":7,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 8","layer":1,"clip":8,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Cegado blanco","layer":2,"clip":9,"name":"","color":3,"led":{"empty":3,"loaded":3,"active":7}},{"type":"clip","label":"Cegado rojo","layer":2,"clip":10,"name":"","color":5,"led":{"empty":3,"loaded":3,"active":7}},{"type":"clip","label":"Cegado naranja","layer":2,"clip":11,"name":"","color":9,"led":{"empty":3,"loaded":3,"active":7}},{"type":"clip","label":"Cegado amarillo","layer":2,"clip":12,"name":"","color":13,"led":{"empty":3,"loaded":3,"active":7}},{"type":"clip","label":"Cegado verde","layer":2,"clip":13,"name":"","color":21,"led":{"empty":3,"loaded":3,"active":7}},{"type":"clip","label":"Cegado cian","layer":2,"clip":14,"name":"","color":37,"led":{"empty":3,"loaded":3,"active":7}},{"type":"clip","label":"Cegado azul","layer":2,"clip":15,"name":"","color":45,"led":{"empty":3,"loaded":3,"active":7}},{"type":"clip","label":"Cegado magenta","layer":2,"clip":16,"name":"","color":53,"led":{"empty":3,"loaded":3,"active":7}},{"type":"clip","label":"Strobo blanco","layer":2,"clip":1,"name":"","color":3,"led":{"empty":10,"loaded":10,"active":7}},{"type":"clip","label":"Strobo rojo","layer":2,"clip":2,"name":"","color":5,"led":{"empty":10,"loaded":10,"active":7}},{"type":"clip","label":"Strobo naranja","layer":2,"clip":3,"name":"","color":9,"led":{"empty":10,"loaded":10,"active":7}},{"type":"clip","label":"Strobo amarillo","layer":2,"clip":4,"name":"","color":13,"led":{"empty":10,"loaded":10,"active":7}},{"type":"clip","label":"Strobo verde","layer":2,"clip":5,"name":"","color":21,"led":{"empty":10,"loaded":10,"active":7}},{"type":"clip","label":"Strobo cian","layer":2,"clip":6,"name":"","color":37,"led":{"empty":10,"loaded":10,"active":7}},{"type":"clip","label":"Strobo azul","layer":2,"clip":7,"name":"","color":45,"led":{"empty":10,"loaded":10,"active":7}},{"type":"clip","label":"Strobo magenta","layer":2,"clip":8,"name":"","color":53,"led":{"empty":10,"loaded":10,"active":7}}],"bottom":[{"type":"bypass","label":"Bypass Visuales","layers":[1],"led":{"idle":0,"active":2}},{"type":"bypass","label":"Bypass Outline","layers":[3],"led":{"idle":0,"active":2}},{"type":"bypass","label":"Bypass Strobos","layers":[2],"led":{"idle":0,"active":2}},{"type":"bypass","label":"Bypass Pixel","layers":[4],"led":{"idle":0,"active":2}},{"type":"bypass","label":"Bypass Madrix","layers":[5],"led":{"idle":0,"active":2}},{"type":"none","label":"","led":{"idle":0,"active":0}},{"type":"prev","label":"Clip anterior de Visuales","layer":1,"led":{"idle":0,"active":1}},{"type":"next","label":"Clip siguiente de Visuales","layer":1,"led":{"idle":0,"active":1}}],"side":[{"type":"clearAll","label":"Limpiar todo","led":{"idle":0,"active":1}},{"type":"clear","label":"Limpiar Strobos","layers":[2],"led":{"idle":0,"active":1}},{"type":"blackout","label":"Blackout","led":{"idle":0,"active":2}},{"type":"clear","label":"Limpiar Visuales","layers":[1],"led":{"idle":0,"active":1}},{"type":"clear","label":"Limpiar Outline","layers":[3],"led":{"idle":0,"active":1}},{"type":"clear","label":"Limpiar Pixel + Madrix","layers":[4,5],"led":{"idle":0,"active":1}},{"type":"none","label":"","led":{"idle":0,"active":0}},{"type":"refresh","label":"Refrescar LEDs","led":{"idle":0,"active":1}}],"shift":{"type":"refresh","label":"Refrescar LEDs","led":{"idle":0,"active":0}},"faders":[{"type":"layerOpacity","label":"Visuales","layer":1},{"type":"layerOpacity","label":"Outline","layer":3},{"type":"layerOpacity","label":"Pixel","layer":4},{"type":"layerOpacity","label":"Madrix","layer":5},{"type":"none","label":""},{"type":"none","label":""},{"type":"clipSpeed","label":"Velocidad Outline clip 10","layer":3,"clip":10,"min":0.25,"max":4,"name":""},{"type":"layerMaster","label":"Master Strobos","layer":2},{"type":"compMaster","label":"Master composición"}],"options":{"tempoSync":true,"pollHz":1,"repaintEvery":5,"rgbHz":5,"speedMethod":"put","autoReload":true,"debug":false}},"scripts":{"apc_to_resolume.js":"// APC mini mk2 -> Resolume (OSC)\n// Script del módulo MIDI \"apc\". Lo que pulsas en el APC sale por OSC al módulo \"resolume\".\n//\n// Este script NO lleva el mapa dentro: lo lee de apc_config.json, en la misma carpeta que\n// el script. El mapa se edita con configurador.html. Si no encuentra el archivo, usa el mapa\n// que el configurador dejó incluido al exportar (EMBEDDED_CONFIG).\n//\n// Además de Resolume, cualquier control puede mandar OSC o MIDI a otros módulos de Chataigne\n// (\"destinos\" del mapa, por ejemplo un módulo MIDI \"sunlite\" con un puerto loopMIDI).\n//\n// Notas del APC: pads 0-63 (0 = abajo a la izquierda), botones de abajo 100-107,\n// laterales 112-119 (112 = arriba), shift 122, faders CC 48-56.\n//\n// Generado por el configurador APC mini mk2 <-> Resolume. Motor JS de Chataigne: sin let,\n// sin funciones flecha, sin expresiones regulares.\n\nvar CONFIG_FILE = \"apc_config.json\";\nvar EMBEDDED_CONFIG = null; // @@CONFIG@@\n\nvar cfg = null;\nvar cfgText = \"\";\nvar reloadTime = 0;\n\nvar TRACK_FIRST = 100; // botones de abajo 100-107\nvar SCENE_FIRST = 112; // botones laterales 112-119 (112 = arriba)\nvar SHIFT = 122;\nvar FADER_FIRST = 48;  // CC 48-55 faders, 56 master\n\nvar COLORS8 = [3, 5, 9, 13, 21, 37, 45, 53]; // para \"Test LEDs\"\n\nvar bypassed = [];     // por capa: 1 = bypass puesto desde el APC\nfor (var q = 0; q < 100; q++) bypassed.push(0);\nvar blackout = 0;\nvar oscToggle = [];    // por nota: estado de los controles OSC/MIDI en modo interruptor\nfor (var q2 = 0; q2 < 128; q2++) oscToggle.push(0);\nvar extraToggle = [];  // nota * 4 + n: estado de las acciones extra en modo interruptor\nfor (var q3 = 0; q3 < 512; q3++) extraToggle.push(0);\nvar MAX_EXTRA = 4;\nvar warnedTargets = [];\nvar pendingSpeed = [-1, -1, -1, -1, -1, -1, -1, -1, -1]; // fader -> velocidad por enviar\nvar lastSpeed = [-1, -1, -1, -1, -1, -1, -1, -1, -1];\n\nvar testLeds = script.addTrigger(\"Test LEDs\", \"Enciende todos los pads para comprobar que llega el MIDI al APC\");\nvar clearLeds = script.addTrigger(\"Refresh LEDs\", \"Apaga y pide el estado a Resolume\");\nvar reloadMap = script.addTrigger(\"Recargar mapa\", \"Vuelve a leer apc_config.json\");\n\nfunction resolume() { return root.modules.resolume; }\nfunction api() { return root.modules.resolumeapi; }\n\n// Módulo de Chataigne al que va una acción OSC o MIDI. Sin destino = \"resolume\".\nfunction target(id) {\n\tif (!id || id == \"resolume\") return root.modules.resolume;\n\tvar m = root.modules[id];\n\tif (!m) {\n\t\tfor (var i = 0; i < warnedTargets.length; i++) if (warnedTargets[i] == id) return m;\n\t\twarnedTargets.push(id);\n\t\tscript.logError(\"No existe el módulo \\\"\" + id + \"\\\" en Chataigne. Créalo con ese nombre (lo usa el mapa como destino).\");\n\t}\n\treturn m;\n}\n\n// Manda una acción OSC o MIDI: on = 1 al activar, 0 al desactivar.\n//   OSC: valor o 0. Nota: note on con su velocity o note off. CC: valor o 0. Program change: solo al activar.\nfunction sendOut(a, on) {\n\tvar m = target(a.target);\n\tif (!m) return;\n\tif (a.type == \"osc\") { m.send(a.address, on ? a.value : 0); return; }\n\tif (a.msg == \"cc\") m.sendCC(a.channel, a.number, on ? a.value : 0);\n\telse if (a.msg == \"pc\") { if (on) m.sendProgramChange(a.channel, a.number); }\n\telse if (on) m.sendNoteOn(a.channel, a.number, a.value);\n\telse m.sendNoteOff(a.channel, a.number);\n}\n\n// Acciones extra de un control (\"además, enviar...\"): pressed = true al pulsar, false al soltar.\nfunction runExtras(note, d, pressed) {\n\tif (!d.extra) return;\n\tfor (var i = 0; i < d.extra.length && i < MAX_EXTRA; i++) {\n\t\tvar a = d.extra[i];\n\t\tvar k = note * MAX_EXTRA + i;\n\t\tif (a.mode == \"toggle\") {\n\t\t\tif (!pressed) continue;\n\t\t\textraToggle[k] = extraToggle[k] ? 0 : 1;\n\t\t\tsendOut(a, extraToggle[k]);\n\t\t}\n\t\telse if (a.mode == \"hold\") sendOut(a, pressed ? 1 : 0);\n\t\telse if (pressed) { sendOut(a, 1); sendOut(a, 0); }\n\t}\n}\n\n// ---------- mapa ----------\n\nfunction configPath() { return script.getScriptDirectory() + \"/\" + CONFIG_FILE; }\n\n// Devuelve true si el mapa ha cambiado.\nfunction loadConfig() {\n\tvar p = configPath();\n\tif (util.fileExists(p)) {\n\t\tvar text = util.readFile(p);\n\t\tif (cfg && text == cfgText) return false;\n\t\tcfgText = text;\n\t\tvar c = util.readFile(p, true);\n\t\tif (c && c.pads && c.pads.length == 64) {\n\t\t\tcfg = c;\n\t\t\tscript.log(\"Mapa cargado: \" + p + \" (\" + cfg.name + \")\");\n\t\t\treturn true;\n\t\t}\n\t\tscript.logWarning(\"No se pudo leer \" + p + \" (¿JSON roto?). Sigo con el mapa anterior.\");\n\t}\n\tif (!cfg && EMBEDDED_CONFIG) {\n\t\tcfg = EMBEDDED_CONFIG;\n\t\tscript.log(\"No hay \" + CONFIG_FILE + \": uso el mapa incluido en el script (\" + cfg.name + \")\");\n\t\treturn true;\n\t}\n\tif (!cfg) script.logError(\"No hay mapa: falta \" + p);\n\treturn false;\n}\n\nfunction opt(name, def) {\n\tif (cfg && cfg.options && cfg.options[name] != undefined) return cfg.options[name];\n\treturn def;\n}\n\n// Definición del control de una nota (pad, botón o shift).\nfunction defFor(note) {\n\tif (!cfg) return null;\n\tif (note >= 0 && note <= 63) return cfg.pads[note];\n\tif (note >= TRACK_FIRST && note < TRACK_FIRST + 8) return cfg.bottom[note - TRACK_FIRST];\n\tif (note >= SCENE_FIRST && note < SCENE_FIRST + 8) return cfg.side[note - SCENE_FIRST];\n\tif (note == SHIFT) return cfg.shift;\n\treturn null;\n}\n\n// LED de un control en reposo (\"idle\") o activado (\"active\").\n// Pads: canal = brillo/animación, velocity = color. Botones: canal 1, 0 apagado, 1 fijo, 2 parpadeo.\nfunction ctlLed(note, d, on) {\n\tif (note <= 63) {\n\t\tvar ch = on ? d.led.active : d.led.loaded;\n\t\tif (!ch) local.sendNoteOn(1, note, 0);\n\t\telse local.sendNoteOn(ch, note, d.color);\n\t\treturn;\n\t}\n\tif (note == SHIFT) return; // el shift no tiene LED\n\tlocal.sendNoteOn(1, note, on ? d.led.active : d.led.idle);\n}\n\n// ---------- acciones ----------\n\nfunction pulse(address) {\n\tresolume().send(address, 1);\n\tresolume().send(address, 0);\n}\n\nfunction connectClip(layer, clip) {\n\tresolume().send(\"/composition/layers/\" + layer + \"/clips/\" + clip + \"/connect\", 1);\n}\n\nfunction clearLayer(layer) {\n\tresolume().send(\"/composition/layers/\" + layer + \"/clear\", 1);\n}\n\nfunction press(note, d) {\n\tpressMain(note, d);\n\trunExtras(note, d, true);\n}\n\n// Acción principal de un control.\nfunction pressMain(note, d) {\n\tvar t = d.type;\n\tvar i;\n\tif (!t || t == \"none\") return false;\n\n\tif (t == \"clip\") { connectClip(d.layer, d.clip); return false; }\n\tif (t == \"dual\") { connectClip(d.layer, d.clip); connectClip(d.layer2, d.clip2); return false; }\n\tif (t == \"rgb\") { api().sendGET(\"composition/clips/selected?toggle=\" + d.rgb, \"json\"); return false; }\n\n\tif (t == \"bypass\") {\n\t\tvar on = bypassed[d.layers[0]] ? 0 : 1;\n\t\tfor (i = 0; i < d.layers.length; i++) {\n\t\t\tbypassed[d.layers[i]] = on;\n\t\t\tresolume().send(\"/composition/layers/\" + d.layers[i] + \"/bypassed\", on);\n\t\t}\n\t\tctlLed(note, d, on);\n\t\treturn false;\n\t}\n\tif (t == \"blackout\") {\n\t\tblackout = blackout ? 0 : 1;\n\t\tresolume().send(\"/composition/bypassed\", blackout);\n\t\tctlLed(note, d, blackout);\n\t\treturn false;\n\t}\n\tif (t == \"osc\" || t == \"midi\") {\n\t\tif (d.mode == \"toggle\") {\n\t\t\toscToggle[note] = oscToggle[note] ? 0 : 1;\n\t\t\tsendOut(d, oscToggle[note]);\n\t\t\tctlLed(note, d, oscToggle[note]);\n\t\t\treturn false;\n\t\t}\n\t\tsendOut(d, 1);\n\t\tif (d.mode != \"hold\") sendOut(d, 0);\n\t\tctlLed(note, d, 1);\n\t\treturn true;\n\t}\n\n\t// momentáneos\n\tif (t == \"tap\") pulse(\"/composition/tempocontroller/tempotap\");\n\telse if (t == \"resync\") pulse(\"/composition/tempocontroller/resync\");\n\telse if (t == \"clearAll\") pulse(\"/composition/disconnectall\");\n\telse if (t == \"clear\") { for (i = 0; i < d.layers.length; i++) clearLayer(d.layers[i]); }\n\telse if (t == \"prev\" || t == \"next\") api().sendGET(\"composition/layers/\" + d.layer + \"?step=\" + t, \"json\");\n\telse if (t == \"refresh\") refresh();\n\telse return false;\n\n\t// tap y resync en un pad: el LED no cambia al pulsar (el de tap parpadea a tempo)\n\tif (note <= 63 && (t == \"tap\" || t == \"resync\")) return false;\n\tctlLed(note, d, 1);\n\treturn true;\n}\n\nfunction release(note, d) {\n\tvar t = d.type;\n\tif ((t == \"osc\" || t == \"midi\") && d.mode == \"hold\") sendOut(d, 0);\n\tif (isMomentary(note, d)) ctlLed(note, d, 0);\n\trunExtras(note, d, false);\n}\n\nfunction isMomentary(note, d) {\n\tvar t = d.type;\n\tif (t == \"osc\" || t == \"midi\") return d.mode != \"toggle\";\n\tif (t == \"tap\" || t == \"resync\") return note > 63;\n\treturn t == \"clearAll\" || t == \"clear\" || t == \"prev\" || t == \"next\" || t == \"refresh\";\n}\n\n// ---------- callbacks de Chataigne ----------\n\nfunction init() {\n\tloadConfig();\n\tscript.setUpdateRate(20);\n\trefresh();\n}\n\nfunction update(deltaTime) {\n\t// velocidad de clip: como mucho 20 envíos por segundo aunque el fader mande más\n\tfor (var i = 0; i < 9; i++) {\n\t\tif (pendingSpeed[i] < 0) continue;\n\t\tsendSpeed(cfg.faders[i], pendingSpeed[i]);\n\t\tpendingSpeed[i] = -1;\n\t}\n\tif (!opt(\"autoReload\", true)) return;\n\treloadTime += deltaTime;\n\tif (reloadTime < 2) return;\n\treloadTime = 0;\n\tif (loadConfig()) refresh();\n}\n\nfunction scriptParameterChanged(param) {\n\tif (param.is(testLeds)) {\n\t\tfor (var p = 0; p < 64; p++) local.sendNoteOn(7, p, COLORS8[Math.floor(p / 8)]);\n\t\tfor (var b = 0; b < 8; b++) {\n\t\t\tlocal.sendNoteOn(1, TRACK_FIRST + b, 1);\n\t\t\tlocal.sendNoteOn(1, SCENE_FIRST + b, 1);\n\t\t}\n\t\tscript.log(\"Test LEDs enviado\");\n\t}\n\telse if (param.is(clearLeds)) refresh();\n\telse if (param.is(reloadMap)) {\n\t\tcfgText = \"\";\n\t\tloadConfig();\n\t\trefresh();\n\t}\n}\n\nfunction noteOnEvent(channel, pitch, velocity) {\n\tif (velocity == 0) { noteOffEvent(channel, pitch, velocity); return; }\n\tvar d = defFor(pitch);\n\tif (d) press(pitch, d);\n}\n\nfunction noteOffEvent(channel, pitch, velocity) {\n\tvar d = defFor(pitch);\n\tif (d) release(pitch, d);\n}\n\nfunction ccEvent(channel, number, value) {\n\tif (!cfg) return;\n\tvar i = number - FADER_FIRST;\n\tif (i < 0 || i > 8) return;\n\tvar f = cfg.faders[i];\n\tvar x = value / 127.0;\n\tvar t = f.type;\n\tif (t == \"layerOpacity\") resolume().send(\"/composition/layers/\" + f.layer + \"/video/opacity\", x);\n\telse if (t == \"layerMaster\") resolume().send(\"/composition/layers/\" + f.layer + \"/master\", x);\n\telse if (t == \"compMaster\") resolume().send(\"/composition/master\", x);\n\telse if (t == \"compOpacity\") resolume().send(\"/composition/video/opacity\", x);\n\telse if (t == \"osc\") {\n\t\tvar mn = f.min == undefined ? 0 : f.min;\n\t\tvar mx = f.max == undefined ? 1 : f.max;\n\t\tvar m = target(f.target);\n\t\tif (m) m.send(f.address, mn + (mx - mn) * x);\n\t}\n\telse if (t == \"midiCC\") {\n\t\tvar mc = target(f.target);\n\t\tif (mc) mc.sendCC(f.channel, f.number, Math.round(f.min + (f.max - f.min) * x));\n\t}\n\telse if (t == \"clipSpeed\") {\n\t\t// curva exponencial: con 0,25 y 4 queda 0,25x abajo, 1x en el centro y 4x arriba\n\t\tvar speed = f.min * Math.pow(f.max / f.min, x);\n\t\tif (Math.abs(speed - lastSpeed[i]) < 0.0001) return;\n\t\tlastSpeed[i] = speed;\n\t\tpendingSpeed[i] = speed;\n\t}\n}\n\n// Velocidad de un clip. Por OSC Resolume la ignora, así que va por la API web:\n//  \"put\"       = PUT del clip por su número de capa y clip (no necesita ids)\n//  \"websocket\" = como antes: resolume_api.js lee el id y lo manda por el módulo \"resolumews\"\nfunction sendSpeed(f, speed) {\n\tvar path = \"composition/layers/\" + f.layer + \"/clips/\" + f.clip;\n\tif (opt(\"debug\", false)) script.log(\"velocidad \" + path + \" -> \" + speed + \" (\" + opt(\"speedMethod\", \"put\") + \")\");\n\tif (opt(\"speedMethod\", \"put\") == \"websocket\") {\n\t\tapi().sendGET(path + \"?speed=\" + speed, \"json\");\n\t\treturn;\n\t}\n\tapi().sendPUT(path, {\n\t\tpayload: { transport: { controls: { speed: { value: speed } } } },\n\t\textraHeaders: \"Content-Type: application/json\",\n\t\tdataType: \"raw\"\n\t});\n}\n\n// Pinta los controles que no dependen de Resolume y pide a Resolume el estado de lo demás.\n// Los pads de clips los pinta resolume_to_apc.js y los R/G/B resolume_api.js: aquí no se\n// tocan para no pisarse.\nfunction refresh() {\n\tif (!cfg) return;\n\tvar p, d, t, k, n;\n\tvar askBlackout = false;\n\n\tfor (p = 0; p < 64; p++) {\n\t\td = cfg.pads[p];\n\t\tt = d.type;\n\t\tif (t == \"clip\" || t == \"dual\" || t == \"rgb\") continue;\n\t\tif (t == \"bypass\" || t == \"blackout\") ctlLed(p, d, 0);\n\t\telse if ((t == \"osc\" || t == \"midi\") && d.mode == \"toggle\") ctlLed(p, d, oscToggle[p]);\n\t\telse if (!t || t == \"none\") local.sendNoteOn(1, p, 0);\n\t\telse ctlLed(p, d, 0);\n\t}\n\tfor (k = 0; k < 16; k++) {\n\t\tn = k < 8 ? TRACK_FIRST + k : SCENE_FIRST + k - 8;\n\t\td = defFor(n);\n\t\tif ((d.type == \"osc\" || d.type == \"midi\") && d.mode == \"toggle\") ctlLed(n, d, oscToggle[n]);\n\t\telse if (!d.type || d.type == \"none\") local.sendNoteOn(1, n, 0);\n\t\telse ctlLed(n, d, 0);\n\t}\n\n\t// estado de blackout y bypass: lo devuelve Resolume y lo pinta resolume_to_apc.js\n\tfor (k = 0; k < 81; k++) {\n\t\tn = k < 64 ? k : (k < 72 ? TRACK_FIRST + k - 64 : (k < 80 ? SCENE_FIRST + k - 72 : SHIFT));\n\t\td = defFor(n);\n\t\tif (d.type == \"blackout\") askBlackout = true;\n\t\tif (d.type == \"bypass\")\n\t\t\tfor (var b = 0; b < d.layers.length; b++) resolume().send(\"/composition/layers/\" + d.layers[b] + \"/bypassed\", \"?\");\n\t}\n\tif (askBlackout) resolume().send(\"/composition/bypassed\", \"?\");\n\n\tfor (p = 0; p < 64; p++) {\n\t\td = cfg.pads[p];\n\t\tif (d.type == \"clip\" || d.type == \"dual\")\n\t\t\tresolume().send(\"/composition/layers/\" + d.layer + \"/clips/\" + d.clip + \"/connected\", \"?\");\n\t}\n}\n","resolume_to_apc.js":"// Resolume (OSC) -> LEDs del APC mini mk2\n// Script del módulo OSC \"resolume\". Escucha el estado de los clips y pinta los pads.\n//\n// El mapa se lee de apc_config.json (misma carpeta que el script), igual que apc_to_resolume.js.\n//\n// Estado \"connected\" que manda Resolume por clip:\n//   0 vacío  1 cargado  2 cargado+preview  3 conectado  4 conectado+preview\n// En el mapa: vacío = led.empty, cargado (1-2) = led.loaded, activo (3-4) = led.active.\n//\n// En el mk2 el canal MIDI es el brillo: 1=10% 2=25% 3=50% 4=65% 5=75% 6=90% 7=100%\n// 8-11 = pulso (1/16, 1/8, 1/4, 1/2), 12-16 = parpadeo (1/24, 1/16, 1/8, 1/4, 1/2). 0 = apagado.\n//\n// Generado por el configurador APC mini mk2 <-> Resolume.\n\nvar CONFIG_FILE = \"apc_config.json\";\nvar EMBEDDED_CONFIG = null; // @@CONFIG@@\n\nvar cfg = null;\nvar cfgText = \"\";\nvar reloadTime = 0;\n\nvar TRACK_FIRST = 100;\nvar SCENE_FIRST = 112;\nvar SHIFT = 122;\n\nvar state = [];\nfor (var i = 0; i < 64; i++) state.push(-1); // -1 = aún sin estado\nvar ticks = 0;\nvar lastBpm = 0;\n\nfunction apc() { return root.modules.apc; }\n\n// ---------- mapa ----------\n\nfunction configPath() { return script.getScriptDirectory() + \"/\" + CONFIG_FILE; }\n\nfunction loadConfig() {\n\tvar p = configPath();\n\tif (util.fileExists(p)) {\n\t\tvar text = util.readFile(p);\n\t\tif (cfg && text == cfgText) return false;\n\t\tcfgText = text;\n\t\tvar c = util.readFile(p, true);\n\t\tif (c && c.pads && c.pads.length == 64) {\n\t\t\tcfg = c;\n\t\t\tscript.log(\"Mapa cargado: \" + p + \" (\" + cfg.name + \")\");\n\t\t\treturn true;\n\t\t}\n\t\tscript.logWarning(\"No se pudo leer \" + p + \" (¿JSON roto?). Sigo con el mapa anterior.\");\n\t}\n\tif (!cfg && EMBEDDED_CONFIG) {\n\t\tcfg = EMBEDDED_CONFIG;\n\t\tscript.log(\"No hay \" + CONFIG_FILE + \": uso el mapa incluido en el script (\" + cfg.name + \")\");\n\t\treturn true;\n\t}\n\tif (!cfg) script.logError(\"No hay mapa: falta \" + p);\n\treturn false;\n}\n\nfunction opt(name, def) {\n\tif (cfg && cfg.options && cfg.options[name] != undefined) return cfg.options[name];\n\treturn def;\n}\n\nfunction defFor(note) {\n\tif (!cfg) return null;\n\tif (note >= 0 && note <= 63) return cfg.pads[note];\n\tif (note >= TRACK_FIRST && note < TRACK_FIRST + 8) return cfg.bottom[note - TRACK_FIRST];\n\tif (note >= SCENE_FIRST && note < SCENE_FIRST + 8) return cfg.side[note - SCENE_FIRST];\n\tif (note == SHIFT) return cfg.shift;\n\treturn null;\n}\n\n// Recorre todas las notas con control: 0-63, 100-107, 112-119, 122.\nfunction noteAt(k) {\n\tif (k < 64) return k;\n\tif (k < 72) return TRACK_FIRST + k - 64;\n\tif (k < 80) return SCENE_FIRST + k - 72;\n\treturn SHIFT;\n}\n\nfunction ctlLed(note, d, on) {\n\tif (note <= 63) {\n\t\tvar ch = on ? d.led.active : d.led.loaded;\n\t\tif (!ch) apc().sendNoteOn(1, note, 0);\n\t\telse apc().sendNoteOn(ch, note, d.color);\n\t\treturn;\n\t}\n\tif (note == SHIFT) return;\n\tapc().sendNoteOn(1, note, on ? d.led.active : d.led.idle);\n}\n\n// ---------- callbacks ----------\n\nfunction init() {\n\tloadConfig();\n\tpaintInitial();\n\tscript.setUpdateRate(opt(\"pollHz\", 1));\n}\n\n// Al arrancar, los pads de clip que tienen luz aunque estén vacíos (strobos, cegados)\n// se encienden ya, sin esperar a Resolume.\nfunction paintInitial() {\n\tif (!cfg) return;\n\tfor (var p = 0; p < 64; p++) {\n\t\tstate[p] = -1;\n\t\tvar d = cfg.pads[p];\n\t\tif ((d.type == \"clip\" || d.type == \"dual\") && d.led.empty) drawPad(p, 0);\n\t}\n}\n\nfunction update(deltaTime) {\n\tif (!cfg) { loadConfig(); return; }\n\n\tif (opt(\"autoReload\", true)) {\n\t\treloadTime += deltaTime;\n\t\tif (reloadTime >= 2) {\n\t\t\treloadTime = 0;\n\t\t\tif (loadConfig()) paintInitial();\n\t\t}\n\t}\n\n\t// Tempo: se pregunta a Resolume y se pasa al módulo MIDI del APC, que le manda reloj\n\t// MIDI; así los parpadeos y pulsos del APC van al BPM.\n\tif (opt(\"tempoSync\", true)) local.send(\"/composition/tempocontroller/tempo\", \"?\");\n\n\t// cada N sondeos se olvida el estado para repintar todos los pads con la siguiente respuesta\n\tticks++;\n\tif (ticks >= opt(\"repaintEvery\", 5)) {\n\t\tticks = 0;\n\t\tfor (var s = 0; s < 64; s++) state[s] = -1;\n\t}\n\n\t// se vuelve a pedir el estado de todos los clips del APC por si se pierde algún cambio\n\tfor (var p = 0; p < 64; p++) {\n\t\tvar d = cfg.pads[p];\n\t\tif (d.type == \"clip\" || d.type == \"dual\")\n\t\t\tlocal.send(\"/composition/layers/\" + d.layer + \"/clips/\" + d.clip + \"/connected\", \"?\");\n\t}\n}\n\nfunction setTempo(value) {\n\tvar bpm = value <= 1 ? 20 + value * 480 : value; // Resolume lo manda normalizado 20-500\n\tif (Math.abs(bpm - lastBpm) < 0.05) return;\n\tlastBpm = bpm;\n\tvar t = apc().values.tempo;\n\tt.bpm.set(bpm);\n\tif (!t.sendClock.get()) t.sendClock.set(true);\n}\n\nfunction oscEvent(address, args) {\n\tif (!cfg) return;\n\tvar k, n, d, b;\n\n\tif (address == \"/composition/tempocontroller/tempo\" && args.length > 0) {\n\t\tif (opt(\"tempoSync\", true)) setTempo(parseFloat(args[0]));\n\t\treturn;\n\t}\n\n\t// /composition/bypassed -> LED de los controles de blackout\n\tif (address == \"/composition/bypassed\" && args.length > 0) {\n\t\tvar bo = parseInt(args[0]) ? 1 : 0;\n\t\tfor (k = 0; k < 81; k++) {\n\t\t\tn = noteAt(k);\n\t\t\td = defFor(n);\n\t\t\tif (d.type == \"blackout\") ctlLed(n, d, bo);\n\t\t}\n\t\treturn;\n\t}\n\n\tvar parts = address.split(\"/\");\n\n\t// /composition/layers/L/bypassed -> LED de los controles de bypass de esa capa\n\tif (parts.length == 5 && parts[2] == \"layers\" && parts[4] == \"bypassed\" && args.length > 0) {\n\t\tvar bl = parseInt(parts[3]);\n\t\tvar on = parseInt(args[0]) ? 1 : 0;\n\t\tfor (k = 0; k < 81; k++) {\n\t\t\tn = noteAt(k);\n\t\t\td = defFor(n);\n\t\t\tif (d.type == \"bypass\" && d.layers[0] == bl) ctlLed(n, d, on);\n\t\t}\n\t\treturn;\n\t}\n\n\t// /composition/layers/L/clips/C/connected\n\t// (no /connect: ese es el disparo y vale 1 aunque el clip suene)\n\tif (parts.length != 7 || parts[2] != \"layers\" || parts[4] != \"clips\" || parts[6] != \"connected\") return;\n\tif (args.length < 1) return;\n\n\tvar layer = parseInt(parts[3]);\n\tvar clip = parseInt(parts[5]);\n\tvar v = parseInt(args[0]);\n\n\tfor (var p = 0; p < 64; p++) {\n\t\td = cfg.pads[p];\n\t\tif (d.type != \"clip\" && d.type != \"dual\") continue;\n\t\tif (d.layer != layer || d.clip != clip) continue;\n\t\tif (state[p] == v) continue; // sin cambios (llega cada segundo por el sondeo)\n\t\tstate[p] = v;\n\t\tdrawPad(p, v);\n\t}\n}\n\nfunction drawPad(pad, v) {\n\tvar d = cfg.pads[pad];\n\tvar ch = v <= 0 ? d.led.empty : (v <= 2 ? d.led.loaded : d.led.active);\n\tif (!ch) apc().sendNoteOn(1, pad, 0);\n\telse apc().sendNoteOn(ch, pad, d.color);\n}\n","resolume_api.js":"// Funciones que necesitan leer el estado de Resolume por su API web\n// Script del módulo HTTP \"resolumeapi\" (Base Address http://127.0.0.1:8080/api/v1/).\n//\n// El mapa se lee de apc_config.json (misma carpeta que el script), igual que apc_to_resolume.js.\n//\n// - Pads R/G/B del clip seleccionado (pads de tipo \"rgb\"): se consulta el clip seleccionado\n//   varias veces por segundo. Activo = led.active, canal quitado = led.loaded,\n//   clip vacío = led.empty. Al pulsar, apc_to_resolume.js pide el clip con \"?toggle=r\"\n//   (g, b) y aquí se manda por OSC el valor contrario.\n// - Clip anterior / siguiente: apc_to_resolume.js pide la capa con \"?step=prev\" o\n//   \"?step=next\" y aquí se busca el clip activo y se conecta el anterior o siguiente que\n//   tenga contenido.\n// - Velocidad de clip con speedMethod = \"websocket\": apc_to_resolume.js pide el clip con\n//   \"?speed=X\", aquí se lee el id del parámetro y se manda por el módulo \"resolumews\".\n//   Con speedMethod = \"put\" (por defecto) apc_to_resolume.js lo hace solo y aquí no llega nada.\n//\n// Generado por el configurador APC mini mk2 <-> Resolume.\n\nvar CONFIG_FILE = \"apc_config.json\";\nvar EMBEDDED_CONFIG = null; // @@CONFIG@@\n\nvar cfg = null;\nvar cfgText = \"\";\nvar reloadTime = 0;\n\nvar CH = [\"r\", \"g\", \"b\"];\n\nfunction apc() { return root.modules.apc; }\nfunction osc() { return root.modules.resolume; }\n\n// ---------- mapa ----------\n\nfunction configPath() { return script.getScriptDirectory() + \"/\" + CONFIG_FILE; }\n\nfunction loadConfig() {\n\tvar p = configPath();\n\tif (util.fileExists(p)) {\n\t\tvar text = util.readFile(p);\n\t\tif (cfg && text == cfgText) return false;\n\t\tcfgText = text;\n\t\tvar c = util.readFile(p, true);\n\t\tif (c && c.pads && c.pads.length == 64) {\n\t\t\tcfg = c;\n\t\t\tscript.log(\"Mapa cargado: \" + p + \" (\" + cfg.name + \")\");\n\t\t\treturn true;\n\t\t}\n\t\tscript.logWarning(\"No se pudo leer \" + p + \" (¿JSON roto?). Sigo con el mapa anterior.\");\n\t}\n\tif (!cfg && EMBEDDED_CONFIG) {\n\t\tcfg = EMBEDDED_CONFIG;\n\t\tscript.log(\"No hay \" + CONFIG_FILE + \": uso el mapa incluido en el script (\" + cfg.name + \")\");\n\t\treturn true;\n\t}\n\tif (!cfg) script.logError(\"No hay mapa: falta \" + p);\n\treturn false;\n}\n\nfunction opt(name, def) {\n\tif (cfg && cfg.options && cfg.options[name] != undefined) return cfg.options[name];\n\treturn def;\n}\n\nfunction hasRgbPads() {\n\tif (!cfg) return false;\n\tfor (var p = 0; p < 64; p++) if (cfg.pads[p].type == \"rgb\") return true;\n\treturn false;\n}\n\n// ---------- callbacks ----------\n\nfunction init() {\n\tloadConfig();\n\tscript.setUpdateRate(opt(\"rgbHz\", 5));\n}\n\nfunction update(deltaTime) {\n\tif (opt(\"autoReload\", true)) {\n\t\treloadTime += deltaTime;\n\t\tif (reloadTime >= 2) {\n\t\t\treloadTime = 0;\n\t\t\tloadConfig();\n\t\t}\n\t}\n\tif (hasRgbPads()) local.sendGET(\"composition/clips/selected\", \"json\");\n}\n\nfunction dataEvent(data, url) {\n\tif (!cfg) return;\n\tif (url.indexOf(\"speed=\") >= 0) setSpeed(data, url);\n\telse if (url.indexOf(\"step=\") >= 0) stepClip(data, url);\n\telse if (url.indexOf(\"clips/selected\") >= 0) rgb(data, url);\n\t// las respuestas a los PUT de velocidad llegan vacías: no hay nada que hacer\n}\n\nfunction rgb(data, url) {\n\tvar p, d;\n\t// sin clip cargado en la selección: brillo de \"vacío\" y no se cambia nada\n\tif (!data.video || (data.connected && data.connected.value == \"Empty\")) {\n\t\tfor (p = 0; p < 64; p++) {\n\t\t\td = cfg.pads[p];\n\t\t\tif (d.type != \"rgb\") continue;\n\t\t\tif (!d.led.empty) apc().sendNoteOn(1, p, 0);\n\t\t\telse apc().sendNoteOn(d.led.empty, p, d.color);\n\t\t}\n\t\treturn;\n\t}\n\tvar v = data.video;\n\tvar vals = [v.r.value, v.g.value, v.b.value];\n\n\tvar t = url.indexOf(\"toggle=\");\n\tif (t >= 0) {\n\t\tvar ch = url.substring(t + 7, t + 8);\n\t\tfor (var i = 0; i < 3; i++) {\n\t\t\tif (CH[i] != ch) continue;\n\t\t\tvals[i] = vals[i] ? false : true;\n\t\t\tosc().send(\"/composition/selectedclip/video/\" + ch + \"scale\", vals[i] ? 1 : 0);\n\t\t}\n\t}\n\n\tfor (p = 0; p < 64; p++) {\n\t\td = cfg.pads[p];\n\t\tif (d.type != \"rgb\") continue;\n\t\tfor (var j = 0; j < 3; j++) {\n\t\t\tif (CH[j] != d.rgb) continue;\n\t\t\tvar c = vals[j] ? d.led.active : d.led.loaded;\n\t\t\tif (!c) apc().sendNoteOn(1, p, 0);\n\t\t\telse apc().sendNoteOn(c, p, d.color);\n\t\t}\n\t}\n}\n\nfunction stepClip(data, url) {\n\tif (!data.clips) return;\n\tvar clips = data.clips;\n\tvar n = clips.length;\n\tvar dir = url.indexOf(\"step=prev\") >= 0 ? -1 : 1;\n\n\tvar current = -1;\n\tfor (var i = 0; i < n; i++)\n\t\tif (clips[i].connected.value.indexOf(\"Connected\") == 0) current = i;\n\n\tvar start = current < 0 ? (dir > 0 ? -1 : n) : current;\n\tfor (var k = 1; k <= n; k++) {\n\t\tvar idx = start + dir * k;\n\t\tif (idx < 0 || idx >= n) return; // no da la vuelta\n\t\tif (clips[idx].connected.value != \"Empty\") {\n\t\t\tvar layer = url.substring(url.indexOf(\"layers/\") + 7, url.indexOf(\"?\"));\n\t\t\tosc().send(\"/composition/layers/\" + layer + \"/clips/\" + (idx + 1) + \"/connect\", 1);\n\t\t\treturn;\n\t\t}\n\t}\n}\n\n// Velocidad de un clip por WebSocket (speedMethod = \"websocket\"): por OSC Resolume no deja\n// cambiarla, así que se manda por el módulo \"resolumews\" usando el id del parámetro, que se\n// lee del clip pedido. Los ids cambian cada vez que se abre Resolume: por eso se leen siempre.\nfunction setSpeed(data, url) {\n\tvar ws = root.modules.resolumews;\n\tif (!ws) {\n\t\tscript.logError(\"velocidad: no existe el módulo WebSocket \\\"resolumews\\\". Créalo en Chataigne (WebSocket Client, Server Path 127.0.0.1:8080/api/v1) o usa speedMethod = put\");\n\t\treturn;\n\t}\n\tif (!data.transport || !data.transport.controls || !data.transport.controls.speed) {\n\t\tscript.logWarning(\"velocidad: el clip no tiene transport/speed (\" + url + \")\");\n\t\treturn;\n\t}\n\tvar id = data.transport.controls.speed.id;\n\tvar value = parseFloat(url.substring(url.indexOf(\"speed=\") + 6));\n\tvar msg = '{\"action\":\"set\",\"parameter\":\"/parameter/by-id/' + id + '\",\"value\":' + value + '}';\n\tif (opt(\"debug\", false)) script.log(\"velocidad: envío \" + msg);\n\tws.send(msg);\n}\n"},"noisette":{"metaData":{"version":"1.10.4","versionNumber":68100},"projectSettings":{"containers":{"dashboardSettings":{"parameters":[{"value":"","controlAddress":"/showDashboardOnStartup","enabled":false}]},"customDefinitions":{}}},"dashboardManager":{"viewOffset":[0,0],"viewZoom":1},"parrots":{"viewOffset":[0,0],"viewZoom":1},"layout":{"mainLayout":{"type":1,"width":2046,"height":1302,"direction":2,"shifters":[{"type":1,"width":2046,"height":1302,"direction":2,"shifters":[{"type":1,"width":2046,"height":727,"direction":1,"shifters":[{"type":1,"width":307,"height":727,"direction":2,"shifters":[{"type":0,"width":307,"height":370,"currentContent":"Modules","tabs":[{"name":"Modules"}]},{"type":0,"width":307,"height":350,"currentContent":"Custom Variables","tabs":[{"name":"Custom Variables"}]}]},{"type":0,"width":1299,"height":727,"currentContent":"State Machine","tabs":[{"name":"State Machine"},{"name":"Dashboard"},{"name":"Module Router"},{"name":"Morpher"}]},{"type":0,"width":428,"height":727,"currentContent":"Inspector","tabs":[{"name":"Inspector"}]}]},{"type":1,"width":2046,"height":568,"direction":1,"shifters":[{"type":0,"width":178,"height":568,"currentContent":"Sequences","tabs":[{"name":"Sequences"}]},{"type":0,"width":1382,"height":568,"currentContent":"Sequence Editor","tabs":[{"name":"Sequence Editor"}]},{"type":0,"width":474,"height":568,"currentContent":"Logger","tabs":[{"name":"Help"},{"name":"Logger"},{"name":"Warnings"}]}]}]}]},"windows":null},"modules":{"items":[{"parameters":[{"value":true,"controlAddress":"/enabled"}],"niceName":"apc","type":"MIDI","scripts":{"items":[{"parameters":[{"value":"D:/VISUALES/Jungle Tribal/chataigne/apc_to_resolume.js","controlAddress":"/filePath"}],"niceName":"apc_to_resolume","type":"BaseItem","scriptParams":{}}],"viewOffset":[0,0],"viewZoom":1},"params":{"parameters":[{"value":false,"controlAddress":"/autoAdd"},{"value":false,"controlAddress":"/useHierarchy"},{"value":false,"controlAddress":"/usePitchForNoteNames"},{"value":["\\\\?\\usb#vid_09e8&pid_004f&mi_00#6&7dcb32a&0&0000#{6994ad04-93ef-11d0-a3cc-00a0c9223196}\\global","\\\\?\\usb#vid_09e8&pid_004f&mi_00#6&7dcb32a&0&0000#{6994ad04-93ef-11d0-a3cc-00a0c9223196}\\global"],"inputName":"APC mini mk2","outputName":"APC mini mk2","controlAddress":"/devices"}],"containers":{"pass_through":{}}},"templates":{"viewOffset":[0,0],"viewZoom":1},"values":{"containers":{"infos":{"parameters":[{"value":false,"controlAddress":"/oneNoteOn"},{"value":41,"hexMode":false,"controlAddress":"/lastPitch"},{"value":127,"hexMode":false,"controlAddress":"/lastVelocity"}]},"tempo":{"parameters":[{"value":133.7914085388184,"controlAddress":"/bpm"},{"value":true,"controlAddress":"/sendClock"}]},"mtc":{}}}},{"parameters":[{"value":true,"controlAddress":"/logIncoming"}],"niceName":"resolume","type":"OSC","scripts":{"items":[{"parameters":[{"value":"D:/VISUALES/Jungle Tribal/chataigne/resolume_to_apc.js","controlAddress":"/filePath"},{"value":1,"hexMode":false,"controlAddress":"/updateRate"}],"niceName":"resolume_to_apc","type":"BaseItem","scriptParams":{"hideInEditor":true}}],"viewOffset":[0,0],"viewZoom":1},"params":{"parameters":[{"value":"Auto","controlAddress":"/networkInterface"}],"containers":{"oscInput":{"parameters":[{"value":7001,"hexMode":false,"controlAddress":"/localPort"}]},"oscOutputs":{"items":[{"parameters":[{"value":"127.0.0.1","controlAddress":"/remoteHost"},{"value":7000,"hexMode":false,"controlAddress":"/remotePort"}],"niceName":"OSC Output","type":"BaseItem"}],"viewOffset":[0,0],"viewZoom":1},"pass_through":{}}},"templates":{"viewOffset":[0,0],"viewZoom":1},"values":{}},{"niceName":"resolumeapi","type":"HTTP","scripts":{"items":[{"parameters":[{"value":"D:/VISUALES/Jungle Tribal/chataigne/resolume_api.js","controlAddress":"/filePath"},{"value":5,"hexMode":false,"controlAddress":"/updateRate"}],"niceName":"resolume_api","type":"BaseItem","scriptParams":{"hideInEditor":true}}],"viewOffset":[0,0],"viewZoom":1},"params":{"parameters":[{"value":"http://127.0.0.1:8080/api/v1/","controlAddress":"/baseAddress"},{"value":false,"controlAddress":"/autoAdd"},{"value":"JSON","controlAddress":"/protocol"}],"containers":{"authentication":{"parameters":[{"value":false,"controlAddress":"/enabled"}]}}},"templates":{"viewOffset":[0,0],"viewZoom":1},"values":{}}],"viewOffset":[0,0],"viewZoom":1},"customVariables":{"viewOffset":[0,0],"viewZoom":1},"states":{"viewOffset":[0,0],"viewZoom":1,"transitions":{"hideInEditor":true,"viewOffset":[0,0],"viewZoom":1},"comments":{"hideInEditor":true,"viewOffset":[0,0],"viewZoom":1}},"sequences":{"viewOffset":[0,0],"viewZoom":1},"routers":{"viewOffset":[0,0],"viewZoom":1}}};</script>
+<script>// Configurador APC mini mk2 <-> Resolume (vía Chataigne). Interfaz del navegador.
+// Todo el estado está en `cfg` (el mapa); cada cambio pasa por commit() para poder deshacer.
+(function () {
+	"use strict";
+
+	const G = window.APCGen;
+	const DATA = window.APP_DATA;
+
+	// ---------- constantes del APC mini mk2 ----------
+
+	// Paleta de 128 colores del APC mini mk2 (velocity -> color). Los LEDs reales se ven algo distintos.
+	const PALETTE = [
+		"#000000", "#1E1E1E", "#7F7F7F", "#FFFFFF", "#FF4C4C", "#FF0000", "#590000", "#190000",
+		"#FFBD6C", "#FF5400", "#591D00", "#271B00", "#FFFF4C", "#FFFF00", "#595900", "#191900",
+		"#88FF4C", "#54FF00", "#1D5900", "#142B00", "#4CFF4C", "#00FF00", "#005900", "#001900",
+		"#4CFF5E", "#00FF19", "#00590D", "#001902", "#4CFF88", "#00FF55", "#00591D", "#001F12",
+		"#4CFFB7", "#00FF99", "#005935", "#001912", "#4CC3FF", "#00A9FF", "#004152", "#001019",
+		"#4C88FF", "#0055FF", "#001D59", "#000819", "#4C4CFF", "#0000FF", "#000059", "#000019",
+		"#874CFF", "#5400FF", "#190064", "#0F0030", "#FF4CFF", "#FF00FF", "#590059", "#190019",
+		"#FF4C87", "#FF0054", "#59001D", "#220013", "#FF1500", "#993500", "#795100", "#436400",
+		"#033900", "#005735", "#00547F", "#0000FF", "#00454F", "#2500CC", "#7F7F7F", "#202020",
+		"#FF0000", "#BDFF2D", "#AFED06", "#64FF09", "#108B00", "#00FF87", "#00A9FF", "#002AFF",
+		"#3F00FF", "#7A00FF", "#B21A7D", "#402100", "#FF4A00", "#88E106", "#72FF15", "#00FF00",
+		"#3BFF26", "#59FF71", "#38FFCC", "#5B8AFF", "#3151C6", "#877FE9", "#D31DFF", "#FF005D",
+		"#FF7F00", "#B9B000", "#90FF00", "#835D07", "#392B00", "#144C10", "#0D5038", "#15152A",
+		"#16205A", "#693C1C", "#A8000A", "#DE513D", "#D86A1C", "#FFE126", "#9EE12F", "#67B50F",
+		"#1E1E30", "#DCFF6B", "#80FFBD", "#9A99FF", "#8E66FF", "#404040", "#757575", "#E0FFFF",
+		"#A00000", "#350000", "#1AD000", "#074200", "#B9B000", "#3F3100", "#B35F00", "#4B1502"
+	];
+	const TESTED = [[3, "blanco"], [5, "rojo"], [9, "naranja"], [13, "amarillo"], [21, "verde"], [37, "cian"], [45, "azul"], [53, "magenta"], [57, "rosa"]];
+	const RAINBOW = [3, 5, 9, 13, 21, 37, 45, 53];
+
+	// Canal MIDI del LED = brillo o animación
+	const LED_OPTIONS = [
+		[0, "Apagado"],
+		[1, "Fijo 10 %"], [2, "Fijo 25 %"], [3, "Fijo 50 %"], [4, "Fijo 65 %"], [5, "Fijo 75 %"], [6, "Fijo 90 %"], [7, "Fijo 100 %"],
+		[8, "Pulso 1/16"], [9, "Pulso 1/8"], [10, "Pulso 1/4"], [11, "Pulso 1/2"],
+		[12, "Parpadeo 1/24"], [13, "Parpadeo 1/16"], [14, "Parpadeo 1/8"], [15, "Parpadeo 1/4"], [16, "Parpadeo 1/2"]
+	];
+	const LEVELS = [0, 0.18, 0.3, 0.5, 0.65, 0.75, 0.9, 1];
+	const PULSE_FRAC = { 8: 1 / 16, 9: 1 / 8, 10: 1 / 4, 11: 1 / 2 };
+	const BLINK_FRAC = { 12: 1 / 24, 13: 1 / 16, 14: 1 / 8, 15: 1 / 4, 16: 1 / 2 };
+	const BTN_LED = [[0, "Apagado"], [1, "Encendido"], [2, "Parpadeo"]];
+	const BOTTOM_COLOR = "#ff3b2b", SIDE_COLOR = "#38ff5c";
+
+	const PAD_TYPES = [
+		["Resolume · clips", [["clip", "Lanzar un clip"], ["dual", "Lanzar dos clips a la vez"]]],
+		["Resolume · funciones", [["rgb", "R/G/B del clip seleccionado"], ["tap", "Tap tempo"], ["resync", "Resync"],
+			["bypass", "Bypass de capa"], ["blackout", "Blackout"], ["clear", "Vaciar capa(s)"], ["clearAll", "Limpiar todo"],
+			["prev", "Clip anterior"], ["next", "Clip siguiente"], ["refresh", "Refrescar LEDs"]]],
+		["Mensajes libres", [["osc", "Mensaje OSC"], ["midi", "Mensaje MIDI (Sunlite, etc.)"]]],
+		["", [["none", "Nada"]]]
+	];
+	const BUTTON_TYPES = [
+		["Resolume", [["bypass", "Bypass de capa"], ["clear", "Vaciar capa(s)"], ["blackout", "Blackout"], ["clearAll", "Limpiar todo"],
+			["prev", "Clip anterior"], ["next", "Clip siguiente"], ["tap", "Tap tempo"], ["resync", "Resync"], ["refresh", "Refrescar LEDs"]]],
+		["Mensajes libres", [["osc", "Mensaje OSC"], ["midi", "Mensaje MIDI (Sunlite, etc.)"]]],
+		["", [["none", "Nada"]]]
+	];
+	const FADER_TYPES = [
+		["Resolume", [["layerOpacity", "Opacidad de capa"], ["layerMaster", "Master de capa"], ["compMaster", "Master de la composición"],
+			["compOpacity", "Opacidad de la composición (video/opacity)"], ["clipSpeed", "Velocidad de un clip"]]],
+		["Mensajes libres", [["osc", "Parámetro OSC"], ["midiCC", "MIDI CC (Sunlite, etc.)"]]],
+		["", [["none", "Nada"]]]
+	];
+	const ICONS = {
+		rgb: "", tap: "TAP", resync: "SYNC", bypass: "BYP", blackout: "BLK", clear: "CLR", clearAll: "ALL",
+		prev: "◀", next: "▶", refresh: "↻", osc: "OSC", midi: "MIDI"
+	};
+	const OSC_SUGGESTIONS = [
+		"/composition/layers/1/clips/1/connect", "/composition/layers/1/clear", "/composition/layers/1/bypassed",
+		"/composition/layers/1/video/opacity", "/composition/layers/1/master", "/composition/master", "/composition/bypassed",
+		"/composition/disconnectall", "/composition/tempocontroller/tempotap", "/composition/tempocontroller/resync",
+		"/composition/selectedclip/video/rscale", "/composition/layers/1/clips/1/video/effects/strobe/effect/frequency"
+	];
+	const LED_PRESETS = {
+		normal: { name: "Clips normales: vacío apagado, cargado fijo, sonando parpadea", led: { empty: 0, loaded: 7, active: 15 } },
+		strobe: { name: "Strobos: siempre con luz, pulso en reposo, fijo al sonar", led: { empty: 10, loaded: 10, active: 7 } },
+		blind: { name: "Cegados: media luz, fijo al sonar", led: { empty: 3, loaded: 3, active: 7 } },
+		custom: { name: "Personalizado", led: null }
+	};
+
+	// ---------- estado ----------
+
+	const store = {
+		get(k, def) { try { const v = localStorage.getItem("apcres." + k); return v == null ? def : JSON.parse(v); } catch (e) { return def; } },
+		set(k, v) { try { localStorage.setItem("apcres." + k, JSON.stringify(v)); } catch (e) { /* sin almacenamiento: no pasa nada */ } }
+	};
+
+	let cfg = G.normalizeConfig(store.get("current", null) || DATA.defaultConfig);
+	let sel = { kind: "pad", idx: [] };       // kind: pad | bottom | side | shift | fader
+	let comp = store.get("composition", null); // composición de Resolume (solo nombres)
+	let previewMode = store.get("preview", "mixed");
+	let bpm = store.get("bpm", 128);
+	let folder = store.get("folder", "D:/VISUALES/Jungle Tribal/chataigne");
+	let exportOpts = store.get("exportOpts", { scripts: true, noisette: false });
+	let history = [], future = [];
+	let clipboard = null;
+	let dirHandle = null;
+	let showState = {};
+
+	const $ = (id) => document.getElementById(id);
+	const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+	const clone = (o) => JSON.parse(JSON.stringify(o));
+
+	function commit(fn) {
+		history.push(JSON.stringify(cfg));
+		if (history.length > 200) history.shift();
+		future = [];
+		fn();
+		cfg = G.normalizeConfig(cfg);
+		store.set("current", cfg);
+		renderAll();
+	}
+	function undo() {
+		if (!history.length) return;
+		future.push(JSON.stringify(cfg));
+		cfg = JSON.parse(history.pop());
+		store.set("current", cfg);
+		renderAll();
+	}
+	function redo() {
+		if (!future.length) return;
+		history.push(JSON.stringify(cfg));
+		cfg = JSON.parse(future.pop());
+		store.set("current", cfg);
+		renderAll();
+	}
+
+	function toast(msg, isErr) {
+		const t = document.createElement("div");
+		t.className = "toast" + (isErr ? " err" : "");
+		t.textContent = msg;
+		document.body.appendChild(t);
+		setTimeout(() => t.remove(), isErr ? 7000 : 3500);
+	}
+
+	// ---------- utilidades del mapa ----------
+
+	function layerName(n) {
+		const l = comp && comp.layers[n - 1];
+		return (l && l.name) || cfg.layers[String(n)] || "";
+	}
+	function layerLabel(n) { const nm = layerName(n); return "Capa " + n + (nm ? " · " + nm : ""); }
+	function clipName(layer, clip) {
+		const i = comp && G.clipInfo(comp, layer, clip);
+		return i && !i.missing ? i.name : "";
+	}
+	function ctlAt(kind, i) {
+		if (kind == "pad") return cfg.pads[i];
+		if (kind == "bottom") return cfg.bottom[i];
+		if (kind == "side") return cfg.side[i];
+		if (kind == "shift") return cfg.shift;
+		return cfg.faders[i];
+	}
+	function selected() { return sel.idx.map((i) => ctlAt(sel.kind, i)); }
+	function isToggle(d) { return d.type == "bypass" || d.type == "blackout" || ((d.type == "osc" || d.type == "midi") && d.mode == "toggle"); }
+	function autoLabel(d) {
+		if (d.label) return d.label;
+		if (d.type == "clip") return clipName(d.layer, d.clip) || (layerName(d.layer) || "Capa " + d.layer) + " " + d.clip;
+		if (d.type == "dual") return clipName(d.layer, d.clip) || "L" + d.layer + "+L" + d.layer2;
+		if (d.type == "rgb") return d.rgb.toUpperCase();
+		return "";
+	}
+	function noteOf(kind, i) {
+		if (kind == "pad") return i;
+		if (kind == "bottom") return 100 + i;
+		if (kind == "side") return 112 + i;
+		if (kind == "shift") return 122;
+		return "CC " + (48 + i);
+	}
+	function ctlTitle(kind, i) {
+		if (kind == "pad") return "Pad fila " + (Math.floor(i / 8) + 1) + " · columna " + ((i % 8) + 1);
+		if (kind == "bottom") return "Botón de abajo " + (i + 1);
+		if (kind == "side") return "Botón lateral " + (i + 1) + (i == 0 ? " (arriba)" : "");
+		if (kind == "shift") return "Shift";
+		return "Fader " + (i + 1) + (i == 8 ? " (master)" : "");
+	}
+
+	// LEDs por tipo: qué estados tiene sentido configurar
+	function padStates(d) {
+		const t = d.type;
+		if (t == "clip" || t == "dual") return [["empty", "Vacío"], ["loaded", "Cargado"], ["active", "Sonando"]];
+		if (t == "rgb") return [["empty", "Sin clip seleccionado"], ["loaded", "Canal quitado"], ["active", "Canal activo"]];
+		if (t == "tap") return [["loaded", "Siempre (va a tempo)"]];
+		if (t == "none") return [];
+		if (isToggle(d)) return [["loaded", "Desactivado"], ["active", "Activado"]];
+		return [["loaded", "En reposo"], ["active", "Al pulsar"]];
+	}
+	function buttonStates(d) {
+		if (d.type == "none") return [];
+		return isToggle(d) ? [["idle", "Desactivado"], ["active", "Activado"]] : [["idle", "En reposo"], ["active", "Al pulsar"]];
+	}
+
+	// Valores por defecto al cambiar la función de un control
+	function padDefaults(t) {
+		const led = {
+			clip: [0, 7, 15], dual: [0, 7, 15], rgb: [1, 14, 7], tap: [0, 15, 15], resync: [0, 7, 7],
+			osc: [0, 3, 7], midi: [0, 3, 7], bypass: [0, 3, 15], blackout: [0, 3, 15], none: [0, 0, 0]
+		}[t] || [0, 3, 7];
+		return { empty: led[0], loaded: led[1], active: led[2] };
+	}
+	function setType(d, t, isPad) {
+		const old = d.type;
+		if (old == t) return;
+		d.type = t;
+		const firstMidi = cfg.targets.filter((x) => x.type == "midi")[0];
+		if (t == "clip" || t == "dual") { d.layer = d.layer || 1; d.clip = d.clip || 1; d.name = ""; }
+		if (t == "dual") { d.layer2 = d.layer2 || 2; d.clip2 = d.clip2 || 1; d.name2 = ""; }
+		if (t == "osc") { d.target = "resolume"; d.address = d.address || "/composition/"; d.value = 1; d.mode = "pulse"; }
+		if (t == "midi") { d.target = firstMidi ? firstMidi.id : ""; d.msg = "note"; d.channel = 1; d.number = 36; d.value = 127; d.mode = "pulse"; }
+		if (t == "bypass" || t == "clear") d.layers = d.layers || [1];
+		if (isPad) {
+			if (!(old == "clip" && t == "dual") && !(old == "dual" && t == "clip")) d.led = padDefaults(t);
+			if (!d.color && t != "none") d.color = 3;
+		} else {
+			d.led = { idle: 0, active: t == "none" ? 0 : (t == "bypass" || t == "blackout" ? 2 : 1) };
+		}
+	}
+
+	// ---------- vista previa de LEDs ----------
+
+	function beat() { return 60 / Math.max(20, bpm || 120); }
+	function ledHtml(ch, hex) {
+		if (!ch) return "";
+		let style = "background:" + hex + ";";
+		let cls = "led";
+		let dur = 0;
+		if (ch <= 7) style += "opacity:" + LEVELS[ch] + ";box-shadow:0 0 " + Math.round(LEVELS[ch] * 12) + "px " + hex + ";";
+		else if (PULSE_FRAC[ch]) { cls += " pulse"; dur = beat() * 4 * PULSE_FRAC[ch]; }
+		else { cls += " blink"; dur = beat() * 4 * BLINK_FRAC[ch]; }
+		if (dur) style += "animation-duration:" + dur.toFixed(3) + "s;animation-delay:-" + ((performance.now() / 1000) % dur).toFixed(3) + "s;";
+		return '<div class="' + cls + '" style="' + style + '"></div>';
+	}
+	function buttonLedHtml(v, hex) {
+		if (!v) return "";
+		if (v == 1) return ledHtml(7, hex);
+		const dur = beat();
+		return '<div class="led blink" style="background:' + hex + ";animation-duration:" + dur.toFixed(3) + "s;animation-delay:-" + ((performance.now() / 1000) % dur).toFixed(3) + 's"></div>';
+	}
+	function previewPadState(i) {
+		const d = cfg.pads[i];
+		const t = d.type;
+		if (t == "none") return null;
+		if (t == "clip" || t == "dual") {
+			if (previewMode == "empty" || previewMode == "loaded" || previewMode == "active") return previewMode;
+			const info = comp && G.clipInfo(comp, d.layer, d.clip);
+			if (info && (info.missing || info.empty)) return "empty";
+			if (previewMode == "show") return showState[i] || "loaded";
+			const row = Math.floor(i / 8), col = i % 8;
+			return col == row % 8 ? "active" : "loaded";
+		}
+		if (t == "rgb") return previewMode == "empty" ? "empty" : (previewMode == "loaded" ? "loaded" : "active");
+		return previewMode == "active" ? "active" : "loaded";
+	}
+	function padLed(i) {
+		const d = cfg.pads[i];
+		const st = previewPadState(i);
+		if (!st) return "";
+		return ledHtml(d.led[st], PALETTE[d.color]);
+	}
+
+	// Simulación de show: cada dos tiempos suena un clip distinto en cada capa
+	let showTimer = null;
+	function updateShowTimer() {
+		if (showTimer) { clearInterval(showTimer); showTimer = null; }
+		if (previewMode != "show") return;
+		const tick = () => {
+			const byLayer = {};
+			cfg.pads.forEach((d, i) => {
+				if (d.type != "clip" && d.type != "dual") return;
+				(byLayer[d.layer] = byLayer[d.layer] || []).push(i);
+			});
+			showState = {};
+			Object.keys(byLayer).forEach((l) => {
+				const pads = byLayer[l];
+				pads.forEach((p) => { showState[p] = "loaded"; });
+				if (Math.random() < 0.8) showState[pads[Math.floor(Math.random() * pads.length)]] = "active";
+			});
+			renderDevice();
+		};
+		tick();
+		showTimer = setInterval(tick, beat() * 2000);
+	}
+
+	// ---------- dibujo del aparato ----------
+
+	function issuesByPad() {
+		const m = {};
+		G.validateConfig(cfg, comp).forEach((w) => {
+			if (!w.ref || w.ref.pad === undefined) return;
+			if (w.level == "error" || !m[w.ref.pad]) m[w.ref.pad] = w.level;
+		});
+		return m;
+	}
+
+	function renderDevice() {
+		const issues = issuesByPad();
+		const isSel = (kind, i) => sel.kind == kind && sel.idx.indexOf(i) >= 0;
+		let h = '<div class="brand" style="grid-row:1"><span>AKAI · APC MINI MK2</span><span>' + esc(cfg.name) + "</span></div>";
+
+		h += '<div class="rowlabels" style="grid-row:2;grid-column:1">';
+		for (let r = 8; r >= 1; r--) h += '<div><span>F' + r + '</span><button class="small" data-tpl="' + (r - 1) + '" title="Plantilla para la fila ' + r + '">▦</button></div>';
+		h += "</div>";
+
+		h += '<div class="grid" style="grid-row:2;grid-column:2">';
+		for (let row = 7; row >= 0; row--) {
+			for (let col = 0; col < 8; col++) {
+				const i = row * 8 + col, d = cfg.pads[i];
+				let ico = d.type == "clip" ? d.layer + "·" + d.clip : d.type == "dual" ? d.layer + "+" + d.layer2 : (ICONS[d.type] || "");
+				if (d.extra && d.extra.length) ico += " +";
+				const badge = issues[i] ? '<span class="badge ' + (issues[i] == "error" ? "err" : "warn") + '">' + (issues[i] == "error" ? "✖" : "⚠") + "</span>" : "";
+				h += '<div class="pad' + (isSel("pad", i) ? " sel" : "") + '" data-kind="pad" data-i="' + i + '" title="' + esc(ctlTitle("pad", i) + " · nota " + i + (autoLabel(d) ? " · " + autoLabel(d) : "")) + '">' +
+					padLed(i) + '<span class="ico">' + esc(ico) + "</span>" + badge + '<span class="lbl">' + esc(autoLabel(d)) + "</span></div>";
+			}
+		}
+		h += "</div>";
+
+		const btnPreview = (d) => previewMode == "active" ? d.led.active : d.led.idle;
+		h += '<div class="side" style="grid-row:2;grid-column:3">';
+		for (let i = 0; i < 8; i++) {
+			const d = cfg.side[i];
+			h += '<div class="btn' + (isSel("side", i) ? " sel" : "") + '" data-kind="side" data-i="' + i + '" title="' + esc(ctlTitle("side", i) + " · nota " + (112 + i)) + '">' +
+				buttonLedHtml(btnPreview(d), SIDE_COLOR) + '<span class="blbl">' + esc(d.label || (d.type == "none" ? "—" : "")) + "</span></div>";
+		}
+		h += "</div>";
+
+		h += '<div class="bottomrow" style="grid-row:3;grid-column:2">';
+		for (let i = 0; i < 8; i++) {
+			const d = cfg.bottom[i];
+			h += '<div class="btn' + (isSel("bottom", i) ? " sel" : "") + '" data-kind="bottom" data-i="' + i + '" title="' + esc(ctlTitle("bottom", i) + " · nota " + (100 + i) + (d.label ? " · " + d.label : "")) + '">' +
+				buttonLedHtml(btnPreview(cfg.bottom[i]), BOTTOM_COLOR) + '<span class="blbl">' + esc(d.label || "") + "</span></div>";
+		}
+		h += "</div>";
+
+		h += '<div class="shiftbox" style="grid-row:3;grid-column:3"><div class="btn' + (isSel("shift", 0) ? " sel" : "") + '" data-kind="shift" data-i="0" title="Shift · nota 122"><span class="blbl">SHIFT</span></div></div>';
+
+		h += '<div class="faders" style="grid-row:4">';
+		for (let i = 0; i < 9; i++) {
+			const f = cfg.faders[i];
+			h += '<div class="fader' + (f.type == "none" ? " none" : "") + (isSel("fader", i) ? " sel" : "") + '" data-kind="fader" data-i="' + i + '" title="' + esc(ctlTitle("fader", i) + " · CC " + (48 + i)) + '">' +
+				'<div class="track"><div class="knob"></div></div><span class="fnum">' + (i + 1) + '</span><span class="flbl">' + esc(faderLabel(f)) + "</span></div>";
+		}
+		h += "</div>";
+		$("device").innerHTML = h;
+	}
+
+	function faderLabel(f) {
+		if (f.label) return f.label;
+		if (f.type == "layerOpacity" || f.type == "layerMaster") return (layerName(f.layer) || "Capa " + f.layer) + (f.type == "layerMaster" ? " master" : "");
+		if (f.type == "compMaster") return "Master";
+		if (f.type == "clipSpeed") return "Velocidad";
+		if (f.type == "osc") return "OSC";
+		if (f.type == "midiCC") return "CC " + f.number;
+		if (f.type == "compOpacity") return "Opacidad comp.";
+		return "—";
+	}
+
+	// ---------- inspector ----------
+
+	function opts(list, value) {
+		return list.map((o) => '<option value="' + esc(o[0]) + '"' + (String(o[0]) == String(value) ? " selected" : "") + ">" + esc(o[1]) + "</option>").join("");
+	}
+	function groupedOpts(groups, value) {
+		return groups.map((g) => g[0] ? '<optgroup label="' + esc(g[0]) + '">' + opts(g[1], value) + "</optgroup>" : opts(g[1], value)).join("");
+	}
+	function field(label, inner, hint) {
+		return '<div class="field"><label>' + label + "</label>" + inner + (hint ? '<div class="hint">' + hint + "</div>" : "") + "</div>";
+	}
+	function input(k, value, t, extra) {
+		const type = t == "int" || t == "num" ? "number" : "text";
+		return '<input type="' + type + '" data-k="' + k + '" data-t="' + (t || "str") + '" value="' + esc(value) + '" ' + (extra || "") + ">";
+	}
+	function select(k, value, optionsHtml, t) {
+		return '<select data-k="' + k + '" data-t="' + (t || "str") + '">' + optionsHtml + "</select>";
+	}
+	function layerInput(k, value) {
+		if (comp && comp.layers.length) {
+			const list = comp.layers.map((l, i) => [i + 1, (i + 1) + " · " + (l.name || "sin nombre")]);
+			if (value > comp.layers.length) list.push([value, value + " · (no existe en Resolume)"]);
+			return select(k, value, opts(list, value), "int");
+		}
+		return '<div class="row"><span class="fixed">' + input(k, value, "int", 'min="1"') + '</span><span class="dim">' + esc(layerName(value)) + "</span></div>";
+	}
+	function clipInput(k, layer, value) {
+		const l = comp && comp.layers[layer - 1];
+		if (l) {
+			const list = l.clips.map((c, i) => [i + 1, (i + 1) + " · " + (c.empty ? "(vacío)" : c.name || "sin nombre")]);
+			if (value > l.clips.length) list.push([value, value + " · (no existe)"]);
+			return select(k, value, opts(list, value), "int");
+		}
+		return input(k, value, "int", 'min="1"');
+	}
+	function nameCheck(k, layer, clip, saved) {
+		if (!comp) {
+			return field("Nombre del clip (para avisar si cambia)", input(k, saved, "str", 'placeholder="Opcional"'),
+				"Lee la composición en la pestaña Resolume para rellenarlo solo.");
+		}
+		const info = G.clipInfo(comp, layer, clip);
+		const actual = info && !info.missing ? info.name : "";
+		let st;
+		if (!info || info.missing) st = '<span class="err">✖ Ese clip no existe en la composición</span>';
+		else if (!saved) st = '<span class="warn">Sin nombre guardado.</span> En Resolume: «' + esc(actual || "vacío") + "»";
+		else if (saved == actual) st = '<span class="ok">✔ Coincide: «' + esc(saved) + "»</span>";
+		else {
+			const found = G.findClip(comp, layer, saved);
+			st = '<span class="err">✖ Esperaba «' + esc(saved) + "» y hay «" + esc(actual || "vacío") + "»</span>" +
+				(found ? ' <button class="small" data-act="moveclip" data-k="' + k + '" data-to="' + found + '">Mover al clip ' + found + "</button>" : "");
+		}
+		const take = actual && actual != saved ? ' <button class="small" data-act="takename" data-k="' + k + '" data-name="' + esc(actual) + '">Guardar «' + esc(actual) + "»</button>" : "";
+		return '<div class="namecheck">' + st + take + "</div>";
+	}
+	function targetOptions(kind, value) {
+		const list = kind == "osc" ? [["resolume", "resolume (Resolume)"]] : [];
+		cfg.targets.filter((t) => t.type == kind).forEach((t) => list.push([t.id, t.id + (t.label ? " (" + t.label + ")" : "")]));
+		if (value && !list.some((o) => o[0] == value)) list.push([value, value + " (no existe)"]);
+		if (!list.length) list.push(["", "— crea un destino MIDI en la pestaña Destinos —"]);
+		return opts(list, value);
+	}
+	function actionFields(prefix, a, isMain) {
+		let h = "";
+		const p = prefix ? prefix + "." : "";
+		if (a.type == "osc") {
+			h += field("Destino", select(p + "target", a.target, targetOptions("osc", a.target)));
+			h += field("Dirección OSC", input(p + "address", a.address, "str", 'list="oscList" spellcheck="false"'));
+			h += '<div class="row">' + field("Valor", input(p + "value", a.value, "num", 'step="any"')) + field("Modo", select(p + "mode", a.mode, opts(modeOptions("osc"), a.mode))) + "</div>";
+		} else {
+			h += field("Destino", select(p + "target", a.target, targetOptions("midi", a.target)));
+			h += '<div class="row">' + field("Mensaje", select(p + "msg", a.msg, opts([["note", "Nota"], ["cc", "CC"], ["pc", "Program change"]], a.msg))) +
+				field("Canal", input(p + "channel", a.channel, "int", 'min="1" max="16"')) + "</div>";
+			h += '<div class="row">' + field(a.msg == "cc" ? "Número de CC" : a.msg == "pc" ? "Programa" : "Nota", input(p + "number", a.number, "int", 'min="0" max="127"')) +
+				(a.msg == "pc" ? "" : field(a.msg == "cc" ? "Valor" : "Velocity", input(p + "value", a.value, "int", 'min="0" max="127"'))) + "</div>";
+			if (a.msg != "pc") h += field("Modo", select(p + "mode", a.mode, opts(modeOptions("midi"), a.mode)));
+		}
+		return h;
+	}
+	function modeOptions(kind) {
+		return kind == "osc"
+			? [["pulse", "Pulso: manda el valor y luego 0"], ["hold", "Mantener: el valor al pulsar, 0 al soltar"], ["toggle", "Interruptor: un toque on, otro off"]]
+			: [["pulse", "Pulso: on y off seguidos"], ["hold", "Mantener: on al pulsar, off al soltar"], ["toggle", "Interruptor: un toque on, otro off"]];
+	}
+
+	function ledSection(d, isPad) {
+		let h = "";
+		if (isPad) {
+			const states = padStates(d);
+			if (!states.length) return "";
+			h += "<h3>Color</h3><div class=\"quick\">" + TESTED.map((c) => '<div data-color="' + c[0] + '" class="' + (d.color == c[0] ? "on" : "") + '" style="background:' + PALETTE[c[0]] + '" title="' + c[1] + " (" + c[0] + ', comprobado)"><span>' + c[0] + "</span></div>").join("") + "</div>";
+			h += '<details' + (TESTED.some((c) => c[0] == d.color) ? "" : " open") + '><summary class="dim">Paleta completa (128 colores) · ahora: ' + d.color + "</summary><div class=\"palette\" style=\"margin-top:6px\">" +
+				PALETTE.map((hex, i) => '<div data-color="' + i + '" class="' + (d.color == i ? "on" : "") + '" style="background:' + hex + '" title="' + i + '"></div>').join("") + "</div></details>";
+			h += "<h3>LED</h3>";
+			states.forEach((s) => {
+				h += '<div class="ledstate"><span>' + s[1] + "</span>" + select("led." + s[0], d.led[s[0]], opts(LED_OPTIONS, d.led[s[0]]), "int") +
+					'<div class="sw">' + ledHtml(d.led[s[0]], PALETTE[d.color]) + "</div></div>";
+			});
+			if (d.type == "tap") h += '<div class="hint">El parpadeo va al BPM de Resolume (Chataigne manda reloj MIDI al APC).</div>';
+		} else {
+			const states = buttonStates(d);
+			if (!states.length) return "";
+			h += "<h3>LED</h3>";
+			states.forEach((s) => {
+				h += '<div class="ledstate"><span>' + s[1] + "</span>" + select("led." + s[0], d.led[s[0]], opts(BTN_LED, d.led[s[0]]), "int") +
+					'<div class="sw">' + buttonLedHtml(d.led[s[0]], sel.kind == "side" ? SIDE_COLOR : BOTTOM_COLOR) + "</div></div>";
+			});
+			h += '<div class="hint">Estos botones son de un solo color: ' + (sel.kind == "side" ? "verde" : "rojo") + ".</div>";
+		}
+		return h;
+	}
+
+	function extrasSection(d) {
+		if (d.type == "none") return "";
+		const ex = d.extra || [];
+		let h = "<h3>Además, enviar…</h3>";
+		if (!ex.length) h += '<p class="dim">Por ejemplo: lanzar el clip en Resolume y a la vez una escena de Sunlite.</p>';
+		ex.forEach((a, k) => {
+			h += '<div class="box"><div class="row" style="margin-bottom:8px"><strong>' + (a.type == "midi" ? "MIDI" : "OSC") + " " + (k + 1) +
+				'</strong><span class="fixed"><button class="small" data-act="delextra" data-n="' + k + '">Quitar</button></span></div>' + actionFields("extra." + k, a) + "</div>";
+		});
+		if (ex.length < G.MAX_EXTRA) h += '<div class="row"><button data-act="addextra" data-type="midi">+ MIDI</button><button data-act="addextra" data-type="osc">+ OSC</button></div>';
+		return h;
+	}
+
+	function renderInspector() {
+		const el = $("tab-ctl");
+		if (!sel.idx.length) {
+			el.innerHTML = '<h2>Elige un control</h2><p class="dim">Haz clic en un pad, un botón, un fader o el Shift del dibujo.</p>' +
+				'<p class="dim">Con Ctrl o Mayús + clic eliges varios a la vez: lo que cambies se aplica a todos.</p>' +
+				'<p class="dim">El botón <strong>▦</strong> de cada fila rellena la fila entera con una plantilla.</p>';
+			return;
+		}
+		const k = sel.kind, list = selected(), d = list[0], multi = list.length > 1;
+		const title = multi ? list.length + " controles seleccionados" : ctlTitle(k, sel.idx[0]);
+		let h = "<h2>" + esc(title) + "</h2>";
+		if (!multi) h += '<p class="dim" style="margin-top:-6px">' + (k == "fader" ? "CC " + (48 + sel.idx[0]) : "Nota " + noteOf(k, sel.idx[0])) + "</p>";
+		if (multi && list.some((x) => x.type != d.type)) h += '<p class="warn">Tienen funciones distintas: se muestran los datos del primero.</p>';
+
+		h += field("Etiqueta", input("label", d.label, "str", 'placeholder="' + esc(k == "fader" ? faderLabel(Object.assign({}, d, { label: "" })) : autoLabel(Object.assign({}, d, { label: "" }))) + '"'));
+
+		if (k == "fader") {
+			h += field("Función", select("type", d.type, groupedOpts(FADER_TYPES, d.type)));
+			if (d.type == "layerOpacity" || d.type == "layerMaster" || d.type == "clipSpeed") h += field("Capa", layerInput("layer", d.layer));
+			if (d.type == "clipSpeed") {
+				h += field("Clip", clipInput("clip", d.layer, d.clip));
+				h += nameCheck("name", d.layer, d.clip, d.name);
+				h += '<div class="row">' + field("Abajo (×)", input("min", d.min, "num", 'step="any" min="0.01"')) + field("Arriba (×)", input("max", d.max, "num", 'step="any"')) + "</div>";
+				h += '<div class="hint">Curva exponencial: con 0,25 y 4 queda 0,25× abajo, 1× en el centro y 4× arriba. Se manda por la API web (' + (cfg.options.speedMethod == "put" ? "PUT" : "WebSocket") + ", ver Opciones).</div>";
+			}
+			if (d.type == "osc") {
+				h += field("Destino", select("target", d.target, targetOptions("osc", d.target)));
+				h += field("Dirección OSC", input("address", d.address, "str", 'list="oscList" spellcheck="false"'));
+				h += '<div class="row">' + field("Valor abajo", input("min", d.min, "num", 'step="any"')) + field("Valor arriba", input("max", d.max, "num", 'step="any"')) + "</div>";
+			}
+			if (d.type == "midiCC") {
+				h += field("Destino", select("target", d.target, targetOptions("midi", d.target)));
+				h += '<div class="row">' + field("Canal", input("channel", d.channel, "int", 'min="1" max="16"')) + field("CC", input("number", d.number, "int", 'min="0" max="127"')) + "</div>";
+				h += '<div class="row">' + field("Valor abajo", input("min", d.min, "int", 'min="0" max="127"')) + field("Valor arriba", input("max", d.max, "int", 'min="0" max="127"')) + "</div>";
+			}
+			if (d.type == "compOpacity") h += '<p class="hint">Ojo: esto es <code>/composition/video/opacity</code>, no el fader Master (<code>/composition/master</code>).</p>';
+		} else {
+			const isPad = k == "pad";
+			h += field("Función", select("type", d.type, groupedOpts(isPad ? PAD_TYPES : BUTTON_TYPES, d.type)));
+			if (d.type == "clip" || d.type == "dual") {
+				h += '<div class="box"><div class="row">' + field(d.type == "dual" ? "Capa (1.º clip)" : "Capa", layerInput("layer", d.layer)) + field("Clip", clipInput("clip", d.layer, d.clip)) + "</div>" +
+					nameCheck("name", d.layer, d.clip, d.name) + "</div>";
+				if (d.type == "dual") {
+					h += '<div class="box"><div class="row">' + field("Capa (2.º clip)", layerInput("layer2", d.layer2)) + field("Clip", clipInput("clip2", d.layer2, d.clip2)) + "</div>" +
+						nameCheck("name2", d.layer2, d.clip2, d.name2) + '<div class="hint">El LED sigue el estado del 1.er clip.</div></div>';
+				}
+			}
+			if (d.type == "rgb") h += field("Canal", select("rgb", d.rgb, opts([["r", "R (rojo)"], ["g", "G (verde)"], ["b", "B (azul)"]], d.rgb)), "Quita o pone ese canal de color del clip seleccionado en Resolume.");
+			if (d.type == "bypass" || d.type == "clear") {
+				h += field("Capas", input("layers", (d.layers || []).join(", "), "layers", 'placeholder="1, 3"'),
+					(d.layers || []).map((n) => esc(layerLabel(n))).join(" · ") + (d.type == "bypass" ? "<br>El LED sigue a la primera capa." : ""));
+			}
+			if (d.type == "prev" || d.type == "next") h += field("Capa", layerInput("layer", d.layer), "Salta al clip " + (d.type == "prev" ? "anterior" : "siguiente") + " que tenga contenido (no da la vuelta).");
+			if (d.type == "osc" || d.type == "midi") h += actionFields("", d, true);
+			if (k == "shift" && d.type != "none") h += '<p class="hint">El Shift no tiene LED.</p>';
+			if (k != "shift") h += ledSection(d, isPad);
+			h += extrasSection(d);
+		}
+
+		h += '<h3>Herramientas</h3><div class="row"><button data-act="copy">Copiar ajustes</button><button data-act="paste"' + (clipboard && clipboard.kind == (k == "pad" ? "pad" : k == "fader" ? "fader" : "button") ? "" : " disabled") + ">Pegar</button>" +
+			'<button data-act="reset">Dejar en «Nada»</button></div>';
+		el.innerHTML = h;
+	}
+
+	// ---------- cambios desde el inspector ----------
+
+	function setPath(o, path, value) {
+		const parts = path.split(".");
+		let cur = o;
+		for (let i = 0; i < parts.length - 1; i++) {
+			const p = parts[i];
+			if (cur[p] == null) cur[p] = /^\d+$/.test(parts[i + 1]) ? [] : {};
+			cur = cur[p];
+		}
+		cur[parts[parts.length - 1]] = value;
+	}
+	function parseVal(el) {
+		const t = el.dataset.t;
+		if (t == "int") return parseInt(el.value, 10) || 0;
+		if (t == "num") { const n = parseFloat(String(el.value).replace(",", ".")); return isNaN(n) ? 0 : n; }
+		if (t == "layers") return G.layerList(el.value);
+		return el.value;
+	}
+
+	function onInspectorChange(e) {
+		const el = e.target.closest("[data-k]");
+		if (!el || !el.closest("#tab-ctl")) return;
+		const k = el.dataset.k, v = parseVal(el);
+		const isPad = sel.kind == "pad";
+		commit(() => {
+			selected().forEach((d) => {
+				if (k == "type") { setType(d, v, isPad); return; }
+				setPath(d, k, v);
+				// al elegir otro clip con la composición cargada, se guarda su nombre
+				if (comp && (k == "clip" || k == "layer")) d.name = clipName(d.layer, d.clip);
+				if (comp && (k == "clip2" || k == "layer2")) d.name2 = clipName(d.layer2, d.clip2);
+			});
+		});
+	}
+
+	function onInspectorClick(e) {
+		const c = e.target.closest("[data-color]");
+		if (c && c.closest("#tab-ctl")) {
+			const v = parseInt(c.dataset.color, 10);
+			commit(() => selected().forEach((d) => { d.color = v; }));
+			return;
+		}
+		const b = e.target.closest("[data-act]");
+		if (!b || !b.closest("#tab-ctl")) return;
+		const act = b.dataset.act;
+		if (act == "addextra") {
+			commit(() => selected().forEach((d) => {
+				d.extra = d.extra || [];
+				if (d.extra.length >= G.MAX_EXTRA) return;
+				const firstMidi = cfg.targets.filter((t) => t.type == "midi")[0];
+				d.extra.push(b.dataset.type == "midi"
+					? { type: "midi", target: firstMidi ? firstMidi.id : "", msg: "note", channel: 1, number: 36, value: 127, mode: "pulse" }
+					: { type: "osc", target: "resolume", address: "/composition/", value: 1, mode: "pulse" });
+			}));
+		}
+		else if (act == "delextra") commit(() => selected().forEach((d) => { if (d.extra) d.extra.splice(parseInt(b.dataset.n, 10), 1); }));
+		else if (act == "takename") commit(() => selected().forEach((d) => { d[b.dataset.k] = b.dataset.name; }));
+		else if (act == "moveclip") {
+			const to = parseInt(b.dataset.to, 10);
+			commit(() => selected().forEach((d) => { if (b.dataset.k == "name2") d.clip2 = to; else d.clip = to; }));
+		}
+		else if (act == "copy") {
+			clipboard = { kind: sel.kind == "pad" ? "pad" : sel.kind == "fader" ? "fader" : "button", data: clone(selected()[0]) };
+			toast("Ajustes copiados. Elige otro control y pulsa Pegar.");
+			renderInspector();
+		}
+		else if (act == "paste" && clipboard) commit(() => sel.idx.forEach((i) => replaceCtl(sel.kind, i, clone(clipboard.data))));
+		else if (act == "reset") commit(() => sel.idx.forEach((i) => replaceCtl(sel.kind, i, { type: "none" })));
+	}
+	function replaceCtl(kind, i, d) {
+		if (kind == "pad") cfg.pads[i] = d;
+		else if (kind == "bottom") cfg.bottom[i] = d;
+		else if (kind == "side") cfg.side[i] = d;
+		else if (kind == "shift") cfg.shift = d;
+		else cfg.faders[i] = d;
+	}
+
+	// ---------- selección ----------
+
+	function onDeviceClick(e) {
+		const tpl = e.target.closest("[data-tpl]");
+		if (tpl) { openTemplate(parseInt(tpl.dataset.tpl, 10)); return; }
+		const el = e.target.closest("[data-kind]");
+		if (!el) return;
+		const kind = el.dataset.kind, i = parseInt(el.dataset.i, 10);
+		if ((e.ctrlKey || e.metaKey || e.shiftKey) && sel.kind == kind) {
+			const p = sel.idx.indexOf(i);
+			if (p >= 0) sel.idx.splice(p, 1); else sel.idx.push(i);
+		} else sel = { kind: kind, idx: [i] };
+		showTab("ctl");
+		renderDevice();
+		renderInspector();
+	}
+	function selectRef(ref) {
+		if (!ref) return;
+		if (ref.pad !== undefined) sel = { kind: "pad", idx: [ref.pad] };
+		else if (ref.fader !== undefined) sel = { kind: "fader", idx: [ref.fader] };
+		else if (ref.group) sel = { kind: ref.group, idx: [ref.index || 0] };
+		showTab("ctl");
+		renderDevice();
+		renderInspector();
+	}
+
+	// ---------- plantilla de fila ----------
+
+	function openTemplate(row) {
+		const dlg = $("tplDialog");
+		const cur = cfg.pads[row * 8];
+		const layerField = (id, v) => comp && comp.layers.length
+			? '<select id="' + id + '">' + opts(comp.layers.map((l, i) => [i + 1, (i + 1) + " · " + (l.name || "sin nombre")]), v) + "</select>"
+			: '<input type="number" id="' + id + '" min="1" value="' + v + '">';
+		dlg.innerHTML = "<h2>Plantilla para la fila " + (row + 1) + "</h2>" +
+			field("Qué hace", '<select id="tplKind">' + opts([["clip", "Lanzar clips de una capa"], ["dual", "Lanzar clips de dos capas a la vez"], ["none", "Vaciar la fila (nada)"]], "clip") + "</select>") +
+			'<div id="tplClip"><div class="row">' + field("Capa", layerField("tplLayer", cur.layer || 1)) + field("Primer clip", '<input type="number" id="tplFirst" min="1" value="' + (cur.clip || 1) + '">') + "</div>" +
+			'<div class="row" id="tplDualRow" style="display:none">' + field("2.ª capa", layerField("tplLayer2", cur.layer2 || 2)) + field("Primer clip", '<input type="number" id="tplFirst2" min="1" value="1">') + "</div>" +
+			'<p class="hint">Los 8 pads lanzan los clips seguidos: primer clip, +1, +2… Luego puedes cambiar pads sueltos.</p></div>' +
+			'<div id="tplLook">' + field("Color", '<select id="tplColorMode">' + opts([["one", "Un color para toda la fila"], ["rainbow", "Arcoíris: blanco, rojo, naranja, amarillo, verde, cian, azul, magenta"], ["keep", "Dejar los colores que tiene"]], "one") + "</select>") +
+			'<div class="quick" id="tplColors">' + TESTED.map((c) => '<div data-tplcolor="' + c[0] + '" class="' + (c[0] == (cur.color || 21) ? "on" : "") + '" style="background:' + PALETTE[c[0]] + '" title="' + c[1] + '"></div>').join("") + "</div>" +
+			field("LED", '<select id="tplLed">' + opts(Object.keys(LED_PRESETS).map((k) => [k, LED_PRESETS[k].name]), "normal") + "</select>") +
+			'<div id="tplCustom" style="display:none">' + ["empty", "loaded", "active"].map((s, n) => '<div class="ledstate"><span>' + ["Vacío", "Cargado", "Sonando"][n] + '</span><select id="tplLed_' + s + '">' + opts(LED_OPTIONS, padDefaults("clip")[s]) + "</select><span></span></div>").join("") + "</div>" +
+			'<label class="check"><input type="checkbox" id="tplLabels" checked> Poner etiquetas con el nombre del clip</label></div>' +
+			'<div class="row" style="margin-top:16px"><button id="tplCancel">Cancelar</button><button class="primary" id="tplApply">Aplicar a la fila ' + (row + 1) + "</button></div>";
+		let color = cur.color || 21;
+		const sync = () => {
+			const kind = $("tplKind").value;
+			$("tplClip").style.display = kind == "none" ? "none" : "";
+			$("tplLook").style.display = kind == "none" ? "none" : "";
+			$("tplDualRow").style.display = kind == "dual" ? "" : "none";
+			$("tplColors").style.display = $("tplColorMode").value == "one" ? "" : "none";
+			$("tplCustom").style.display = $("tplLed").value == "custom" ? "" : "none";
+		};
+		dlg.onchange = sync;
+		dlg.onclick = (e) => {
+			const c = e.target.closest("[data-tplcolor]");
+			if (c) {
+				color = parseInt(c.dataset.tplcolor, 10);
+				dlg.querySelectorAll("[data-tplcolor]").forEach((x) => x.classList.toggle("on", x == c));
+			}
+		};
+		$("tplCancel").onclick = () => dlg.close();
+		$("tplApply").onclick = () => {
+			const kind = $("tplKind").value;
+			const L = parseInt($("tplLayer").value, 10) || 1, first = parseInt($("tplFirst").value, 10) || 1;
+			const L2 = parseInt($("tplLayer2").value, 10) || 1, first2 = parseInt($("tplFirst2").value, 10) || 1;
+			const preset = $("tplLed").value;
+			const led = preset == "custom"
+				? { empty: +$("tplLed_empty").value, loaded: +$("tplLed_loaded").value, active: +$("tplLed_active").value }
+				: LED_PRESETS[preset].led;
+			const colorMode = $("tplColorMode").value, labels = $("tplLabels").checked;
+			commit(() => {
+				for (let c = 0; c < 8; c++) {
+					const i = row * 8 + c, old = cfg.pads[i];
+					if (kind == "none") { cfg.pads[i] = { type: "none" }; continue; }
+					const d = { type: kind, layer: L, clip: first + c, name: clipName(L, first + c), led: clone(led), extra: old.extra };
+					if (kind == "dual") { d.layer2 = L2; d.clip2 = first2 + c; d.name2 = clipName(L2, first2 + c); }
+					d.color = colorMode == "rainbow" ? RAINBOW[c] : colorMode == "keep" ? (old.color || color) : color;
+					d.label = labels ? (d.name || "") : "";
+					cfg.pads[i] = d;
+				}
+			});
+			dlg.close();
+			toast("Fila " + (row + 1) + " actualizada. Ctrl+Z para deshacer.");
+		};
+		sync();
+		dlg.showModal();
+	}
+
+	// ---------- pestaña Resolume ----------
+
+	function renderResolume() {
+		const el = $("tab-res");
+		let h = "<h2>Composición de Resolume</h2>" +
+			'<p class="dim">Sirve para elegir capas y clips por su nombre y para avisar si cambias el orden de los clips en Resolume. Solo lee: no cambia nada en Resolume.</p>' +
+			'<div class="row">' + field("IP del ordenador de Resolume", '<input type="text" id="resHost" value="' + esc(cfg.resolume.host) + '">') +
+			'<div class="field fixed"><label>Puerto web</label><input type="number" id="resPort" value="' + cfg.resolume.apiPort + '"></div></div>' +
+			'<div class="row"><button class="primary" id="btnReadComp">Leer composición</button><button id="btnLoadComp">Cargar desde archivo…</button></div>' +
+			'<p class="hint">Si «Leer» falla (el navegador bloquea leer Resolume desde un archivo), abre <code>http://' + esc(cfg.resolume.host) + ":" + cfg.resolume.apiPort +
+			"/api/v1/composition</code> en otra pestaña, guárdalo con Ctrl+S como <code>composicion.json</code> y cárgalo con el segundo botón.</p>";
+		if (comp) {
+			h += '<div class="box"><strong>' + esc(comp.name || "Composición") + "</strong> · " + comp.layers.length + ' capas <button class="small" id="btnForgetComp" style="float:right">Olvidar</button></div>';
+			const issues = G.checkNames(cfg, comp);
+			const named = cfg.pads.filter((d) => (d.type == "clip" || d.type == "dual") && d.name).length;
+			h += "<h3>Comprobación de nombres</h3>";
+			if (!issues.length) h += '<p class="ok">✔ Todo coincide con la composición.</p>';
+			issues.forEach((w, n) => {
+				h += '<div class="box"><div class="' + (w.level == "error" ? "err" : "warn") + '">' + esc(w.msg) + '</div><div class="row" style="margin-top:6px">' +
+					'<button class="small fixed" data-goto="' + n + '">Ir</button>' +
+					(w.moveTo ? '<button class="small fixed" data-fix="move" data-n="' + n + '">Mover al clip ' + w.moveTo + "</button>" : "") +
+					(w.kind == "name" ? '<button class="small fixed" data-fix="accept" data-n="' + n + '">Usar el clip que hay ahora</button>' : "") + "</div></div>";
+			});
+			h += '<div class="row" style="margin-top:8px"><button id="btnFixAll"' + (issues.some((w) => w.moveTo) ? "" : " disabled") + '>Mover todos los que se han movido</button>' +
+				'<button id="btnSaveNames">Guardar los nombres actuales</button></div>' +
+				'<p class="hint">' + named + " pads tienen nombre guardado. «Guardar los nombres actuales» apunta el nombre que tiene ahora cada clip; hazlo cuando la composición esté bien.</p>";
+			h += "<h3>Capas</h3><table style=\"width:100%;border-collapse:collapse\">" + comp.layers.map((l, i) => '<tr><td class="dim" style="width:30px">' + (i + 1) + "</td><td>" + esc(l.name) + '</td><td class="dim">' + l.clips.filter((c) => !c.empty).length + " clips</td></tr>").join("") + "</table>" +
+				'<button id="btnLayerNames" style="margin-top:8px">Copiar estos nombres al mapa</button>';
+		} else {
+			h += "<h3>Nombres de capa del mapa</h3>" + '<p class="hint">Sin composición cargada, se usan estos nombres en la interfaz.</p>';
+			for (let i = 1; i <= Math.max(5, ...Object.keys(cfg.layers).map(Number)); i++) {
+				h += '<div class="row" style="margin-bottom:4px"><span class="fixed dim" style="width:60px">Capa ' + i + '</span><input type="text" data-layername="' + i + '" value="' + esc(cfg.layers[i] || "") + '"></div>';
+			}
+		}
+		el.innerHTML = h;
+		$("resHost").onchange = (e) => commit(() => { cfg.resolume.host = e.target.value.trim(); });
+		$("resPort").onchange = (e) => commit(() => { cfg.resolume.apiPort = parseInt(e.target.value, 10); });
+		$("btnReadComp").onclick = readComposition;
+		$("btnLoadComp").onclick = () => $("fileComp").click();
+		el.querySelectorAll("[data-layername]").forEach((inp) => {
+			inp.onchange = () => commit(() => { if (inp.value.trim()) cfg.layers[inp.dataset.layername] = inp.value.trim(); else delete cfg.layers[inp.dataset.layername]; });
+		});
+		if (!comp) return;
+		const issues = G.checkNames(cfg, comp);
+		$("btnForgetComp").onclick = () => { comp = null; store.set("composition", null); renderAll(); };
+		$("btnLayerNames").onclick = () => commit(() => { comp.layers.forEach((l, i) => { if (l.name) cfg.layers[i + 1] = l.name; }); });
+		$("btnSaveNames").onclick = () => {
+			if (!confirm("¿Guardar en el mapa el nombre que tiene ahora cada clip en Resolume?")) return;
+			commit(() => {
+				cfg.pads.forEach((d) => {
+					if (d.type == "clip" || d.type == "dual") d.name = clipName(d.layer, d.clip);
+					if (d.type == "dual") d.name2 = clipName(d.layer2, d.clip2);
+				});
+				cfg.faders.forEach((f) => { if (f.type == "clipSpeed") f.name = clipName(f.layer, f.clip); });
+			});
+		};
+		$("btnFixAll").onclick = () => commit(() => issues.forEach((w) => applyFix(w, "move")));
+		el.querySelectorAll("[data-goto]").forEach((b) => { b.onclick = () => selectRef(issues[+b.dataset.goto].ref); });
+		el.querySelectorAll("[data-fix]").forEach((b) => { b.onclick = () => commit(() => applyFix(issues[+b.dataset.n], b.dataset.fix)); });
+	}
+	function applyFix(w, how) {
+		if (w.kind != "name") return;
+		const d = w.ref.pad !== undefined ? cfg.pads[w.ref.pad] : cfg.faders[w.ref.fader];
+		const second = w.which == 2;
+		if (how == "move" && w.moveTo) { if (second) d.clip2 = w.moveTo; else d.clip = w.moveTo; }
+		if (how == "accept") { if (second) d.name2 = clipName(d.layer2, d.clip2); else d.name = clipName(d.layer, d.clip); }
+	}
+
+	async function readComposition() {
+		const url = "http://" + cfg.resolume.host + ":" + cfg.resolume.apiPort + "/api/v1/composition";
+		try {
+			const r = await fetch(url, { cache: "no-store" });
+			if (!r.ok) throw new Error("Resolume respondió " + r.status);
+			setComposition(await r.json());
+		} catch (e) {
+			toast("No se pudo leer " + url + ". Comprueba que el Webserver de Resolume está activado, o guarda la composición en un archivo y cárgala (ver la explicación).", true);
+		}
+	}
+	function setComposition(json) {
+		try {
+			comp = G.parseComposition(json);
+			store.set("composition", comp);
+			toast("Composición leída: " + comp.layers.length + " capas.");
+			renderAll();
+		} catch (e) { toast(e.message, true); }
+	}
+
+	// ---------- pestaña Destinos ----------
+
+	function renderTargets() {
+		const el = $("tab-dst");
+		let h = "<h2>Destinos</h2>" +
+			'<p class="dim">Además de Resolume, cualquier pad, botón o fader puede mandar mensajes a otros programas a través de Chataigne: luces (Sunlite, etc.), otro Resolume, un sampler…</p>' +
+			'<p class="dim">Cada destino es un <strong>módulo de Chataigne</strong> con ese mismo nombre. El .noisette exportado los incluye; si no lo usas, créalos a mano en Chataigne.</p>';
+		cfg.targets.forEach((t, i) => {
+			const uses = countUses(t.id);
+			h += '<div class="box"><div class="row" style="margin-bottom:8px"><strong>' + (t.type == "midi" ? "MIDI" : "OSC") + '</strong><span class="dim">' + uses + " usos</span>" +
+				'<span class="fixed"><button class="small" data-deltarget="' + i + '">Quitar</button></span></div>' +
+				'<div class="row">' + field("Nombre del módulo", '<input type="text" data-target="' + i + '" data-f="id" value="' + esc(t.id) + '" spellcheck="false">', "Minúsculas y números, sin espacios.") +
+				field("Descripción", '<input type="text" data-target="' + i + '" data-f="label" value="' + esc(t.label) + '">') + "</div>" +
+				(t.type == "osc"
+					? '<div class="row">' + field("IP", '<input type="text" data-target="' + i + '" data-f="host" value="' + esc(t.host) + '">') + '<div class="field fixed"><label>Puerto</label><input type="number" data-target="' + i + '" data-f="port" value="' + t.port + '"></div></div>'
+					: field("Puerto MIDI (nota para ti)", '<input type="text" data-target="' + i + '" data-f="device" value="' + esc(t.device) + '" placeholder="loopMIDI Port">', "El puerto se elige en Chataigne, en el módulo «" + esc(t.id) + "».")) +
+				"</div>";
+		});
+		h += '<div class="row"><button data-addtarget="sunlite">+ Sunlite (MIDI)</button><button data-addtarget="midi">+ Destino MIDI</button><button data-addtarget="osc">+ Destino OSC</button></div>' +
+			'<h3>Sunlite paso a paso</h3><ol class="hint" style="padding-left:18px">' +
+			"<li>Instala <strong>loopMIDI</strong> (gratis) y crea un puerto, por ejemplo «loopMIDI Port».</li>" +
+			"<li>Aquí: «+ Sunlite (MIDI)». En los pads elige «Mensaje MIDI» o «Además, enviar… + MIDI» con destino <code>sunlite</code>.</li>" +
+			"<li>En Chataigne, en el módulo <code>sunlite</code>, elige como salida el puerto de loopMIDI.</li>" +
+			"<li>En Sunlite, activa la entrada MIDI con ese mismo puerto y asigna cada nota o CC a su escena, botón o fader (aprendizaje MIDI).</li></ol>";
+		el.innerHTML = h;
+		el.querySelectorAll("[data-target]").forEach((inp) => {
+			inp.onchange = () => {
+				const i = +inp.dataset.target, f = inp.dataset.f;
+				commit(() => {
+					const t = cfg.targets[i];
+					if (f == "id") {
+						const old = t.id, nu = inp.value.toLowerCase().replace(/[^a-z0-9]/g, "");
+						if (!nu || G.RESERVED_TARGETS.indexOf(nu) >= 0 || cfg.targets.some((x, k) => k != i && x.id == nu)) { toast("Ese nombre no vale o ya existe.", true); return; }
+						t.id = nu;
+						renameTargetUses(old, nu);
+					} else t[f] = f == "port" ? parseInt(inp.value, 10) : inp.value;
+				});
+			};
+		});
+		el.querySelectorAll("[data-deltarget]").forEach((b) => {
+			b.onclick = () => {
+				const t = cfg.targets[+b.dataset.deltarget];
+				if (countUses(t.id) && !confirm("«" + t.id + "» se usa en " + countUses(t.id) + " sitios. ¿Quitarlo igualmente? (esos controles darán error)")) return;
+				commit(() => cfg.targets.splice(+b.dataset.deltarget, 1));
+			};
+		});
+		el.querySelectorAll("[data-addtarget]").forEach((b) => {
+			b.onclick = () => commit(() => {
+				const kind = b.dataset.addtarget;
+				const base = kind == "sunlite" ? "sunlite" : kind == "midi" ? "midi" : "osc";
+				let id = base, n = 2;
+				while (cfg.targets.some((x) => x.id == id)) id = base + n++;
+				cfg.targets.push(kind == "osc" ? { id: id, type: "osc", label: "", host: "127.0.0.1", port: 8000 }
+					: { id: id, type: "midi", label: kind == "sunlite" ? "Sunlite Suite" : "", device: kind == "sunlite" ? "loopMIDI Port" : "" });
+			});
+		});
+	}
+	function eachAction(fn) {
+		const ctl = (d) => { if (d.type == "osc" || d.type == "midi") fn(d); (d.extra || []).forEach(fn); };
+		cfg.pads.forEach(ctl); cfg.bottom.forEach(ctl); cfg.side.forEach(ctl); ctl(cfg.shift);
+		cfg.faders.forEach((f) => { if (f.type == "osc" || f.type == "midiCC") fn(f); });
+	}
+	function countUses(id) { let n = 0; eachAction((a) => { if (a.target == id) n++; }); return n; }
+	function renameTargetUses(old, nu) { eachAction((a) => { if (a.target == old) a.target = nu; }); }
+
+	// ---------- pestaña Opciones ----------
+
+	function renderOptions() {
+		const o = cfg.options;
+		$("tab-opt").innerHTML = "<h2>Opciones de los scripts</h2>" +
+			'<div class="box"><label class="check"><input type="checkbox" data-opt="tempoSync"' + (o.tempoSync ? " checked" : "") + "> Parpadeos y pulsos al BPM de Resolume</label>" +
+			'<div class="hint">Chataigne lee el tempo de Resolume y manda reloj MIDI al APC.</div></div>' +
+			'<div class="box"><div class="row">' + field("Sondeo de estados (veces/s)", '<input type="number" data-opt="pollHz" data-t="num" step="0.5" min="0.5" value="' + o.pollHz + '">') +
+			field("Repintar todo cada (sondeos)", '<input type="number" data-opt="repaintEvery" data-t="int" min="1" value="' + o.repaintEvery + '">') + "</div>" +
+			'<div class="hint">Por si se pierde algún mensaje: cada segundo se pregunta el estado de los clips y cada 5 se repinta todo.</div></div>' +
+			'<div class="box">' + field("Consulta de R/G/B (veces/s)", '<input type="number" data-opt="rgbHz" data-t="num" step="1" min="1" value="' + o.rgbHz + '">') + "</div>" +
+			'<div class="box">' + field("Velocidad de clip (faders «Velocidad»)", '<select data-opt="speedMethod">' + opts([["put", "PUT por la API web (recomendado, sin ids)"], ["websocket", "WebSocket con el id del parámetro (método antiguo)"]], o.speedMethod) + "</select>",
+				"PUT necesita solo el módulo HTTP. WebSocket necesita además el módulo <code>resolumews</code>.") + "</div>" +
+			'<div class="box"><label class="check"><input type="checkbox" data-opt="autoReload"' + (o.autoReload ? " checked" : "") + "> Recargar el mapa solo al cambiar apc_config.json</label>" +
+			'<div class="hint">Los scripts miran el archivo cada 2 s. Si lo desactivas, usa el botón «Recargar mapa» del script en Chataigne.</div></div>' +
+			'<div class="box"><label class="check"><input type="checkbox" data-opt="debug"' + (o.debug ? " checked" : "") + "> Mensajes de depuración en el Logger de Chataigne</label></div>";
+		$("tab-opt").querySelectorAll("[data-opt]").forEach((inp) => {
+			inp.onchange = () => commit(() => {
+				const k = inp.dataset.opt;
+				cfg.options[k] = inp.type == "checkbox" ? inp.checked : inp.dataset.t == "num" ? parseFloat(inp.value) : inp.dataset.t == "int" ? parseInt(inp.value, 10) : inp.value;
+			});
+		});
+	}
+
+	// ---------- pestaña Exportar ----------
+
+	function renderExport() {
+		const errs = G.validateConfig(cfg, comp).filter((w) => w.level == "error");
+		const lib = store.get("library", {});
+		const names = Object.keys(lib).sort();
+		$("tab-exp").innerHTML = "<h2>Exportar para Chataigne</h2>" +
+			(errs.length ? '<p class="err">Hay ' + errs.length + " errores en el mapa (lista bajo el APC). Puedes exportar, pero revísalos.</p>" : '<p class="ok">✔ El mapa no tiene errores.</p>') +
+			'<div class="box"><label class="check"><input type="checkbox" checked disabled> <span><code>apc_config.json</code> · el mapa</span></label>' +
+			'<label class="check"><input type="checkbox" id="expScripts"' + (exportOpts.scripts ? " checked" : "") + "> <span>Los 3 scripts <code>.js</code></span></label>" +
+			'<label class="check"><input type="checkbox" id="expNoisette"' + (exportOpts.noisette ? " checked" : "") + "> <span><code>APC_Resolume.noisette</code> (proyecto de Chataigne)</span></label>" +
+			'<div id="noiFolder" style="margin-top:8px;' + (exportOpts.noisette ? "" : "display:none") + '">' + field("Carpeta de los scripts en tu PC", '<input type="text" id="expFolder" value="' + esc(folder) + '">', "El .noisette guarda la ruta completa de cada script.") + "</div>" +
+			'<p class="hint">Los scripts solo hacen falta la primera vez (o al actualizar el configurador). Después, para cambiar el mapa basta con <code>apc_config.json</code>: Chataigne lo recarga solo en 2 segundos.</p></div>' +
+			'<div class="row"><button class="primary" id="btnToFolder">Guardar en la carpeta…</button><button id="btnZip">Descargar ZIP</button></div>' +
+			'<div class="row" style="margin-top:8px"><button id="btnJsonOnly">Descargar solo apc_config.json</button></div>' +
+			(dirHandle ? '<p class="hint">Carpeta elegida: <strong>' + esc(dirHandle.name) + "</strong>. Ctrl+S vuelve a guardar ahí.</p>" : "") +
+			'<p class="hint">«Guardar en la carpeta» funciona en Chrome y Edge. Si ya hay archivos tuyos, se guarda una copia <code>.bak</code> antes de reemplazarlos.</p>' +
+			"<h3>Mapas guardados en este navegador</h3>" +
+			'<div class="row"><select id="libSel">' + (names.length ? opts(names.map((n) => [n, n]), cfg.name) : '<option value="">(ninguno)</option>') + "</select></div>" +
+			'<div class="row" style="margin-top:6px"><button id="libSave">Guardar «' + esc(cfg.name) + '»</button><button id="libLoad"' + (names.length ? "" : " disabled") + '>Cargar</button><button id="libDel"' + (names.length ? "" : " disabled") + ">Borrar</button></div>" +
+			'<p class="hint">Útil para tener un mapa por club o evento. Para pasarlos a otro PC usa «Guardar mapa» (archivo .json).</p>' +
+			'<h3>Empezar de cero</h3><div class="row"><button id="btnDefault">Cargar el mapa de Deseo54</button><button id="btnBlank">Mapa vacío</button></div>';
+		$("expScripts").onchange = (e) => { exportOpts.scripts = e.target.checked; store.set("exportOpts", exportOpts); };
+		$("expNoisette").onchange = (e) => { exportOpts.noisette = e.target.checked; store.set("exportOpts", exportOpts); $("noiFolder").style.display = e.target.checked ? "" : "none"; };
+		$("expFolder").onchange = (e) => { folder = e.target.value.trim(); store.set("folder", folder); };
+		$("btnToFolder").onclick = exportToFolder;
+		$("btnZip").onclick = () => {
+			const files = buildFiles();
+			download(slug(cfg.name) + "-chataigne.zip", new Blob([G.makeZip(files)], { type: "application/zip" }));
+		};
+		$("btnJsonOnly").onclick = () => download("apc_config.json", new Blob([G.configJSON(cfg)], { type: "application/json" }));
+		$("libSave").onclick = () => { const l = store.get("library", {}); l[cfg.name] = cfg; store.set("library", l); toast("Guardado en el navegador: " + cfg.name); renderExport(); };
+		$("libLoad").onclick = () => { const n = $("libSel").value; if (n && lib[n]) { commit(() => { cfg = clone(lib[n]); }); toast("Cargado: " + n); } };
+		$("libDel").onclick = () => { const n = $("libSel").value; if (n && confirm("¿Borrar «" + n + "» del navegador?")) { const l = store.get("library", {}); delete l[n]; store.set("library", l); renderExport(); } };
+		$("btnDefault").onclick = () => { if (confirm("¿Reemplazar el mapa actual por el de Deseo54? (Ctrl+Z para deshacer)")) commit(() => { cfg = clone(DATA.defaultConfig); }); };
+		$("btnBlank").onclick = () => { if (confirm("¿Empezar con un mapa vacío? (Ctrl+Z para deshacer)")) commit(() => { cfg = { name: "Mapa nuevo", layers: clone(cfg.layers) }; }); };
+	}
+
+	function buildFiles() {
+		return G.buildFiles(cfg, DATA.scripts, DATA.noisette, { scripts: exportOpts.scripts, noisette: exportOpts.noisette, folder: folder });
+	}
+	function slug(s) { return String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "mapa"; }
+	function download(name, blob) {
+		const a = document.createElement("a");
+		a.href = URL.createObjectURL(blob);
+		a.download = name;
+		document.body.appendChild(a);
+		a.click();
+		setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+	}
+
+	async function exportToFolder(again) {
+		if (!window.showDirectoryPicker) { toast("Este navegador no puede guardar en carpetas. Usa «Descargar ZIP» o abre el configurador con Chrome o Edge.", true); return; }
+		try {
+			if (!dirHandle || again !== true) dirHandle = await window.showDirectoryPicker({ id: "chataigne", mode: "readwrite" });
+			const files = buildFiles();
+			const backups = [];
+			for (const f of files) {
+				let old = null;
+				try { old = await (await (await dirHandle.getFileHandle(f.name)).getFile()).text(); } catch (e) { /* no existe */ }
+				// copia de seguridad de lo que no generó el configurador (o del .noisette, que puede tener cambios hechos a mano)
+				if (old != null && old != f.text && (f.name.endsWith(".noisette") || (f.name.endsWith(".js") && old.indexOf("Generado por el configurador") < 0))) {
+					await writeFile(f.name + ".bak", old);
+					backups.push(f.name + ".bak");
+				}
+				await writeFile(f.name, f.text);
+			}
+			toast("Guardado en «" + dirHandle.name + "»: " + files.map((f) => f.name).join(", ") + (backups.length ? ". Copias: " + backups.join(", ") : ""));
+			renderExport();
+		} catch (e) {
+			if (e && e.name == "AbortError") return;
+			toast("No se pudo guardar: " + (e && e.message), true);
+		}
+	}
+	async function writeFile(name, text) {
+		const fh = await dirHandle.getFileHandle(name, { create: true });
+		const w = await fh.createWritable();
+		await w.write(text);
+		await w.close();
+	}
+
+	// ---------- avisos y ayuda ----------
+
+	function renderWarnings() {
+		const list = G.validateConfig(cfg, comp);
+		const el = $("warnings");
+		if (!list.length) { el.innerHTML = '<p class="ok">✔ Sin errores en el mapa' + (comp ? " y todo coincide con la composición de Resolume." : ".") + "</p>"; return; }
+		el.innerHTML = "<h3>Revisar (" + list.length + ")</h3>" + list.map((w, n) =>
+			'<div class="item"><span class="' + (w.level == "error" ? "err" : "warn") + '">' + (w.level == "error" ? "✖" : "⚠") + '</span><span class="msg">' + esc(w.msg) + '</span><button class="small" data-warn="' + n + '">Ir</button></div>').join("");
+		el.querySelectorAll("[data-warn]").forEach((b) => { b.onclick = () => selectRef(list[+b.dataset.warn].ref); });
+	}
+
+	function renderHelp() {
+		$("tab-help").innerHTML = "<h2>Cómo funciona</h2>" +
+			'<p>El APC no habla con Resolume: habla con <strong>Chataigne</strong>, que pasa el MIDI a OSC y enciende los LEDs según lo que contesta Resolume. Este configurador genera el mapa (<code>apc_config.json</code>) y los scripts que lo leen.</p>' +
+			"<h3>Primera vez</h3><ol>" +
+			"<li>Exportar → marca los 3 scripts → «Guardar en la carpeta…» → elige la carpeta donde Chataigne tiene los scripts.</li>" +
+			"<li>En Chataigne, en cada módulo (<code>apc</code>, <code>resolume</code>, <code>resolumeapi</code>), pulsa <strong>Reload</strong> en su script.</li>" +
+			"<li>En el Logger de Chataigne debe salir «Mapa cargado».</li></ol>" +
+			"<h3>Cambiar el mapa</h3><ol><li>Edita aquí.</li><li>Exportar → «Guardar en la carpeta» (o Ctrl+S). Basta con <code>apc_config.json</code>.</li><li>Chataigne lo recarga solo en 2 s.</li></ol>" +
+			"<h3>Atajos</h3><ul><li>Ctrl+Z / Ctrl+Y: deshacer / rehacer</li><li>Ctrl+S: guardar otra vez en la carpeta elegida</li><li>Ctrl/Mayús + clic: elegir varios controles</li><li>Esc: quitar la selección</li></ul>" +
+			"<h3>Resolume</h3><ul><li>Entrada OSC en el puerto 7000, salida OSC a 127.0.0.1:7001.</li><li>Webserver activado en el puerto 8080.</li>" +
+			"<li>El APC desactivado en Preferencias → MIDI (ni entrada, ni salida, ni superficie de control).</li></ul>" +
+			'<p class="dim">Más detalles en el README del repositorio.</p>';
+	}
+
+	// ---------- general ----------
+
+	function showTab(name) {
+		document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab == name));
+		document.querySelectorAll(".tabpane").forEach((p) => p.classList.toggle("on", p.id == "tab-" + name));
+	}
+
+	function renderAll() {
+		$("mapName").value = cfg.name;
+		$("btnUndo").disabled = !history.length;
+		$("btnRedo").disabled = !future.length;
+		document.querySelectorAll("#previewSeg button").forEach((b) => b.classList.toggle("on", b.dataset.mode == previewMode));
+		sel.idx = sel.idx.filter((i) => sel.kind == "shift" ? i == 0 : i < (sel.kind == "pad" ? 64 : sel.kind == "fader" ? 9 : 8));
+		renderDevice();
+		renderInspector();
+		renderResolume();
+		renderTargets();
+		renderOptions();
+		renderExport();
+		renderWarnings();
+	}
+
+	function openMapFile(file) {
+		const r = new FileReader();
+		r.onload = () => {
+			try {
+				const j = JSON.parse(r.result);
+				if (j.layers && !j.pads && Array.isArray(j.layers)) { setComposition(j); return; }
+				if (!j.pads) throw new Error("Ese archivo no es un mapa del configurador");
+				commit(() => { cfg = j; });
+				toast("Mapa abierto: " + cfg.name);
+			} catch (e) { toast("No se pudo abrir: " + e.message, true); }
+		};
+		r.readAsText(file);
+	}
+
+	function init() {
+		// lista de direcciones OSC típicas para los campos de dirección
+		const dl = document.createElement("datalist");
+		dl.id = "oscList";
+		dl.innerHTML = OSC_SUGGESTIONS.map((a) => '<option value="' + a + '">').join("");
+		document.body.appendChild(dl);
+
+		// pestaña Destinos (entre Resolume y Opciones)
+		const tabBtn = document.createElement("button");
+		tabBtn.dataset.tab = "dst";
+		tabBtn.textContent = "Destinos";
+		$("tabs").insertBefore(tabBtn, $("tabs").querySelector('[data-tab="opt"]'));
+		const pane = document.createElement("div");
+		pane.className = "tabpane";
+		pane.id = "tab-dst";
+		$("tab-opt").parentNode.insertBefore(pane, $("tab-opt"));
+
+		$("bpm").value = bpm;
+		$("bpm").onchange = (e) => { bpm = parseFloat(e.target.value) || 128; store.set("bpm", bpm); updateShowTimer(); renderDevice(); renderInspector(); };
+		$("previewSeg").onclick = (e) => {
+			const b = e.target.closest("[data-mode]");
+			if (!b) return;
+			previewMode = b.dataset.mode;
+			store.set("preview", previewMode);
+			document.querySelectorAll("#previewSeg button").forEach((x) => x.classList.toggle("on", x == b));
+			updateShowTimer();
+			renderDevice();
+		};
+		$("tabs").onclick = (e) => { const b = e.target.closest("[data-tab]"); if (b) showTab(b.dataset.tab); };
+		$("device").onclick = onDeviceClick;
+		$("tab-ctl").addEventListener("change", onInspectorChange);
+		$("tab-ctl").addEventListener("click", onInspectorClick);
+		$("mapName").onchange = (e) => commit(() => { cfg.name = e.target.value.trim() || "Sin nombre"; });
+		$("btnOpen").onclick = () => $("fileOpen").click();
+		$("fileOpen").onchange = (e) => { if (e.target.files[0]) openMapFile(e.target.files[0]); e.target.value = ""; };
+		$("fileComp").onchange = (e) => {
+			const f = e.target.files[0];
+			if (!f) return;
+			const r = new FileReader();
+			r.onload = () => { try { setComposition(JSON.parse(r.result)); } catch (err) { toast("Ese archivo no es JSON: " + err.message, true); } };
+			r.readAsText(f);
+			e.target.value = "";
+		};
+		$("btnSave").onclick = () => download(slug(cfg.name) + ".json", new Blob([G.configJSON(cfg)], { type: "application/json" }));
+		$("btnUndo").onclick = undo;
+		$("btnRedo").onclick = redo;
+		$("btnExport").onclick = () => showTab("exp");
+		document.addEventListener("keydown", (e) => {
+			const typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement && document.activeElement.tagName);
+			if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() == "z" && !typing) { e.preventDefault(); if (e.shiftKey) redo(); else undo(); }
+			else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() == "y" && !typing) { e.preventDefault(); redo(); }
+			else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() == "s") {
+				e.preventDefault();
+				if (dirHandle) exportToFolder(true); else download(slug(cfg.name) + ".json", new Blob([G.configJSON(cfg)], { type: "application/json" }));
+			}
+			else if (e.key == "Escape" && !typing && !$("tplDialog").open) { sel.idx = []; renderDevice(); renderInspector(); }
+		});
+		renderHelp();
+		renderAll();
+		updateShowTimer();
+	}
+
+	init();
+})();
+</script>
+</body>
+</html>
