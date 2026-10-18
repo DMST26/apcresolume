@@ -30,7 +30,7 @@ function setup(cfg, opts) {
 	opts = opts || {};
 	var files = {};
 	if (cfg) files[FILE] = JSON.stringify(cfg);
-	var rig = createRig({ files: files, withWs: opts.withWs });
+	var rig = createRig({ files: files, withWs: opts.withWs, targets: opts.targets });
 	var dir = opts.dir || path.join(ROOT, "src", "scripts");
 	var s = {
 		apc: rig.load(path.join(dir, "apc_to_resolume.js"), "apc"),
@@ -110,6 +110,54 @@ t.s.api.dataEvent({ transport: { controls: { speed: { id: 1, value: 1 } } } }, "
 ok("sin módulo resolumews: avisa en el log en vez de fallar", t.rig.logs.join("\n").indexOf("no existe el módulo WebSocket") >= 0);
 t.s.api.dataEvent("", "composition/layers/3/clips/10");
 eq("respuesta vacía de un PUT: no hace nada", take(t.rig), []);
+
+// ---------- destinos: Sunlite por MIDI y otro programa por OSC ----------
+var G = require("../src/generator");
+c = clone(BASE);
+c.targets = [{ id: "sunlite", type: "midi", label: "Sunlite" }, { id: "luces", type: "osc", host: "192.168.1.20", port: 9000 }];
+c.pads[3] = { type: "midi", target: "sunlite", msg: "note", channel: 2, number: 36, value: 127, mode: "pulse", color: 13, led: { loaded: 3, active: 7 } };
+c.pads[5] = { type: "midi", target: "sunlite", msg: "cc", channel: 1, number: 20, value: 100, mode: "toggle", color: 9, led: { loaded: 1, active: 15 } };
+c.side[6] = { type: "midi", target: "sunlite", msg: "pc", channel: 1, number: 7, mode: "pulse", led: { idle: 0, active: 1 } };
+// pad de strobo: lanza el clip en Resolume y además una escena de Sunlite y un mensaje OSC
+c.pads[56].extra = [
+	{ type: "midi", target: "sunlite", msg: "note", channel: 1, number: 60, value: 127, mode: "hold" },
+	{ type: "osc", target: "luces", address: "/escena/strobo", value: 1, mode: "toggle" }
+];
+c.faders[4] = { type: "midiCC", target: "sunlite", channel: 1, number: 7, min: 0, max: 127 };
+c.faders[5] = { type: "osc", target: "luces", address: "/master", min: 0, max: 1 };
+c = G.normalizeConfig(c);
+eq("destinos: el mapa es válido", G.validateConfig(c), []);
+t = setup(c, { targets: { sunlite: "midi", luces: "osc" } });
+t.s.apc.noteOnEvent(1, 3, 127); t.s.apc.noteOffEvent(1, 3, 0);
+eq("pad MIDI nota (pulso)", take(t.rig), ["sunlite on 2 36 127", "sunlite off 2 36", "midi 7 3 13", "midi 3 3 13"]);
+t.s.apc.noteOnEvent(1, 5, 127); t.s.apc.noteOffEvent(1, 5, 0);
+t.s.apc.noteOnEvent(1, 5, 127); t.s.apc.noteOffEvent(1, 5, 0);
+eq("pad MIDI CC (interruptor)", take(t.rig), ["sunlite cc 1 20 100", "midi 15 5 9", "sunlite cc 1 20 0", "midi 1 5 9"]);
+t.s.apc.noteOnEvent(1, 118, 127); t.s.apc.noteOffEvent(1, 118, 0);
+eq("botón program change", take(t.rig), ["sunlite pc 1 7", "midi 1 118 1", "midi 1 118 0"]);
+t.s.apc.noteOnEvent(1, 56, 127);
+eq("pad con extras (pulsar)", take(t.rig), ["osc /composition/layers/2/clips/1/connect 1", "sunlite on 1 60 127", "luces osc /escena/strobo 1"]);
+t.s.apc.noteOffEvent(1, 56, 0);
+eq("pad con extras (soltar)", take(t.rig), ["sunlite off 1 60"]);
+t.s.apc.noteOnEvent(1, 56, 127); t.s.apc.noteOffEvent(1, 56, 0);
+eq("pad con extras (segunda vez: el interruptor se apaga)", take(t.rig), ["osc /composition/layers/2/clips/1/connect 1", "sunlite on 1 60 127", "luces osc /escena/strobo 0", "sunlite off 1 60"]);
+t.s.apc.ccEvent(1, 52, 64); t.s.apc.ccEvent(1, 53, 127);
+eq("faders a destinos", take(t.rig), ["sunlite cc 1 7 64", "luces osc /master 1"]);
+
+t = setup(c, { targets: {} });
+t.s.apc.noteOnEvent(1, 3, 127); t.s.apc.noteOnEvent(1, 3, 127);
+ok("destino que no existe en Chataigne: avisa una sola vez", t.rig.logs.filter(function (l) { return l.indexOf("No existe el módulo \"sunlite\"") >= 0; }).length == 1, t.rig.logs.join("\n"));
+
+var bad = clone(c);
+bad.pads[3].target = "nada"; bad.pads[5].target = "luces";
+var errs = G.validateConfig(G.normalizeConfig(bad)).map(function (e) { return e.msg; });
+ok("validación: destino inexistente", errs.join("|").indexOf("«nada» no existe") >= 0, errs.join("|"));
+ok("validación: MIDI a un destino OSC", errs.join("|").indexOf("«luces» es un destino OSC, no MIDI") >= 0 && errs.length == 2, errs.join("|"));
+
+var noi = JSON.parse(G.buildNoisette(JSON.parse(fs.readFileSync(path.join(ROOT, "src", "noisette_template.json"), "utf8")), "D:\\Show\\chataigne\\", c.targets));
+var names = noi.modules.items.map(function (m) { return m.niceName + ":" + m.type; });
+eq(".noisette: módulos", names, ["apc:MIDI", "resolume:OSC", "resolumeapi:HTTP", "resolumews:WebSocket Client", "sunlite:MIDI", "luces:OSC"]);
+eq(".noisette: ruta de los scripts", noi.modules.items[0].scripts.items[0].parameters[0].value, "D:/Show/chataigne/apc_to_resolume.js");
 
 // ---------- recarga del mapa ----------
 t = setup(BASE);

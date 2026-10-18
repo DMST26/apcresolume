@@ -2,6 +2,7 @@
 // Solo hace falta volver a ejecutarlo si se quiere rehacer el mapa por defecto desde cero.
 var fs = require("fs");
 var path = require("path");
+var G = require("./generator");
 
 var COLORS8 = [3, 5, 9, 13, 21, 37, 45, 53];
 var NAMES8 = ["blanco", "rojo", "naranja", "amarillo", "verde", "cian", "azul", "magenta"];
@@ -96,5 +97,5 @@ var config = {
 	}
 };
 
-fs.writeFileSync(path.join(__dirname, "default_config.json"), JSON.stringify(config, null, 1) + "\n");
+fs.writeFileSync(path.join(__dirname, "default_config.json"), G.configJSON(G.normalizeConfig(config)));
 console.log("default_config.json escrito");

@@ -13,52 +13,54 @@
   "4": "pxel",
   "5": "madrix"
  },
+ "targets": [],
  "pads": [
   {
    "type": "rgb",
+   "label": "Rojo (R) del clip seleccionado",
    "rgb": "r",
    "color": 5,
    "led": {
     "empty": 1,
     "loaded": 14,
     "active": 7
-   },
-   "label": "Rojo (R) del clip seleccionado"
+   }
   },
   {
    "type": "rgb",
+   "label": "Verde (G) del clip seleccionado",
    "rgb": "g",
    "color": 21,
    "led": {
     "empty": 1,
     "loaded": 14,
     "active": 7
-   },
-   "label": "Verde (G) del clip seleccionado"
+   }
   },
   {
    "type": "rgb",
+   "label": "Azul (B) del clip seleccionado",
    "rgb": "b",
    "color": 45,
    "led": {
     "empty": 1,
     "loaded": 14,
     "active": 7
-   },
-   "label": "Azul (B) del clip seleccionado"
+   }
   },
   {
    "type": "none",
+   "label": "",
    "color": 0,
    "led": {
     "empty": 0,
     "loaded": 0,
     "active": 0
-   },
-   "label": ""
+   }
   },
   {
    "type": "clip",
+   "label": "Strobe negro",
    "layer": 2,
    "clip": 17,
    "name": "",
@@ -67,41 +69,41 @@
     "empty": 0,
     "loaded": 3,
     "active": 13
-   },
-   "label": "Strobe negro"
+   }
   },
   {
    "type": "none",
+   "label": "",
    "color": 0,
    "led": {
     "empty": 0,
     "loaded": 0,
     "active": 0
-   },
-   "label": ""
+   }
   },
   {
    "type": "resync",
+   "label": "Resync",
    "color": 5,
    "led": {
     "empty": 0,
     "loaded": 7,
     "active": 7
-   },
-   "label": "Resync"
+   }
   },
   {
    "type": "tap",
+   "label": "Tap tempo",
    "color": 9,
    "led": {
     "empty": 0,
     "loaded": 15,
     "active": 15
-   },
-   "label": "Tap tempo"
+   }
   },
   {
    "type": "clip",
+   "label": "Outline 9",
    "layer": 3,
    "clip": 9,
    "name": "",
@@ -110,11 +112,11 @@
     "empty": 0,
     "loaded": 7,
     "active": 15
-   },
-   "label": "Outline 9"
+   }
   },
   {
    "type": "clip",
+   "label": "Outline 10",
    "layer": 3,
    "clip": 10,
    "name": "",
@@ -123,11 +125,11 @@
     "empty": 0,
     "loaded": 7,
     "active": 15
-   },
-   "label": "Outline 10"
+   }
   },
   {
    "type": "clip",
+   "label": "Outline 11",
    "layer": 3,
    "clip": 11,
    "name": "",
@@ -136,11 +138,11 @@
     "empty": 0,
     "loaded": 7,
     "active": 15
-   },
-   "label": "Outline 11"
+   }
   },
   {
    "type": "clip",
+   "label": "Outline 12",
    "layer": 3,
    "clip": 12,
    "name": "",
@@ -149,11 +151,11 @@
     "empty": 0,
     "loaded": 7,
     "active": 15
-   },
-   "label": "Outline 12"
+   }
   },
   {
    "type": "clip",
+   "label": "Outline 13",
    "layer": 3,
    "clip": 13,
    "name": "",
@@ -162,11 +164,11 @@
     "empty": 0,
     "loaded": 7,
     "active": 15
-   },
-   "label": "Outline 13"
+   }
   },
   {
    "type": "clip",
+   "label": "Outline 14",
    "layer": 3,
    "clip": 14,
    "name": "",
@@ -175,11 +177,11 @@
     "empty": 0,
     "loaded": 7,
     "active": 15
-   },
-   "label": "Outline 14"
+   }
   },
   {
    "type": "clip",
+   "label": "Outline 15",
    "layer": 3,
    "clip": 15,
    "name": "",
@@ -188,11 +190,11 @@
     "empty": 0,
     "loaded": 7,
     "active": 15
-   },
-   "label": "Outline 15"
+   }
   },
   {
    "type": "clip",
+   "label": "Outline 16",
    "layer": 3,
    "clip": 16,
    "name": "",
@@ -201,11 +203,11 @@
     "empty": 0,
     "loaded": 7,
     "active": 15
-   },
-   "label": "Outline 16"
+   }
   },
   {
    "type": "clip",
+   "label": "Outline 1",
    "layer": 3,
    "clip": 1,
    "name": "",
@@ -214,11 +216,11 @@
     "empty": 0,
     "loaded": 7,
     "active": 15
-   },
-   "label": "Outline 1"
+   }
   },
   {
    "type": "clip",
+   "label": "Outline 2",
    "layer": 3,
    "clip": 2,
    "name": "",
@@ -227,11 +229,11 @@
     "empty": 0,
     "loaded": 7,
     "active": 15
-   },
-   "label": "Outline 2"
+   }
   },
   {
    "type": "clip",
+   "label": "Outline 3",
    "layer": 3,
    "clip": 3,
    "name": "",
@@ -240,11 +242,11 @@
     "empty": 0,
     "loaded": 7,
     "active": 15
-   },
-   "label": "Outline 3"
+   }
   },
   {
    "type": "clip",
+   "label": "Outline 4",
    "layer": 3,
    "clip": 4,
    "name": "",
@@ -253,11 +255,11 @@
     "empty": 0,
     "loaded": 7,
     "active": 15
-   },
-   "label": "Outline 4"
+   }
   },
   {
    "type": "clip",
+   "label": "Outline 5",
    "layer": 3,
    "clip": 5,
    "name": "",
@@ -266,11 +268,11 @@
     "empty": 0,
     "loaded": 7,
     "active": 15
-   },
-   "label": "Outline 5"
+   }
   },
   {
    "type": "clip",
+   "label": "Outline 6",
    "layer": 3,
    "clip": 6,
    "name": "",
@@ -279,11 +281,11 @@
     "empty": 0,
     "loaded": 7,
     "active": 15
-   },
-   "label": "Outline 6"
+   }
   },
   {
    "type": "clip",
+   "label": "Outline 7",
    "layer": 3,
    "clip": 7,
    "name": "",
@@ -292,11 +294,11 @@
     "empty": 0,
     "loaded": 7,
     "active": 15
-   },
-   "label": "Outline 7"
+   }
   },
   {
    "type": "clip",
+   "label": "Outline 8",
    "layer": 3,
    "clip": 8,
    "name": "",
@@ -305,11 +307,11 @@
     "empty": 0,
     "loaded": 7,
     "active": 15
-   },
-   "label": "Outline 8"
+   }
   },
   {
    "type": "dual",
+   "label": "B07 barrido lento",
    "layer": 4,
    "clip": 9,
    "name": "",
@@ -321,11 +323,11 @@
     "empty": 0,
     "loaded": 7,
     "active": 15
-   },
-   "label": "B07 barrido lento"
+   }
   },
   {
    "type": "dual",
+   "label": "B11 anillos",
    "layer": 4,
    "clip": 13,
    "name": "",
@@ -337,11 +339,11 @@
     "empty": 0,
     "loaded": 7,
     "active": 15
-   },
-   "label": "B11 anillos"
+   }
   },
   {
    "type": "dual",
+   "label": "B08 barrido rápido",
    "layer": 4,
    "clip": 10,
    "name": "",
@@ -353,11 +355,11 @@
     "empty": 0,
     "loaded": 7,
     "active": 15
-   },
-   "label": "B08 barrido rápido"
+   }
   },
   {
    "type": "dual",
+   "label": "B13 destellos",
    "layer": 4,
    "clip": 11,
    "name": "",
@@ -369,11 +371,11 @@
     "empty": 0,
     "loaded": 7,
     "active": 15
-   },
-   "label": "B13 destellos"
+   }
   },
   {
    "type": "dual",
+   "label": "B01 negras (completo)",
    "layer": 4,
    "clip": 3,
    "name": "",
@@ -385,11 +387,11 @@
     "empty": 0,
     "loaded": 7,
     "active": 15
-   },
-   "label": "B01 negras (completo)"
+   }
   },
   {
    "type": "dual",
+   "label": "B06 alterno",
    "layer": 4,
    "clip": 8,
    "name": "",
@@ -401,11 +403,11 @@
     "empty": 0,
     "loaded": 7,
     "active": 15
-   },
-   "label": "B06 alterno"
+   }
   },
   {
    "type": "dual",
+   "label": "B04 random",
    "layer": 4,
    "clip": 6,
    "name": "",
@@ -417,11 +419,11 @@
     "empty": 0,
     "loaded": 7,
     "active": 15
-   },
-   "label": "B04 random"
+   }
   },
   {
    "type": "dual",
+   "label": "B05 random rápido",
    "layer": 4,
    "clip": 7,
    "name": "",
@@ -433,11 +435,11 @@
     "empty": 0,
     "loaded": 7,
     "active": 15
-   },
-   "label": "B05 random rápido"
+   }
   },
   {
    "type": "clip",
+   "label": "Visuales 9",
    "layer": 1,
    "clip": 9,
    "name": "",
@@ -446,11 +448,11 @@
     "empty": 0,
     "loaded": 7,
     "active": 15
-   },
-   "label": "Visuales 9"
+   }
   },
   {
    "type": "clip",
+   "label": "Visuales 10",
    "layer": 1,
    "clip": 10,
    "name": "",
@@ -459,11 +461,11 @@
     "empty": 0,
     "loaded": 7,
     "active": 15
-   },
-   "label": "Visuales 10"
+   }
   },
   {
    "type": "clip",
+   "label": "Visuales 11",
    "layer": 1,
    "clip": 11,
    "name": "",
@@ -472,11 +474,11 @@
     "empty": 0,
     "loaded": 7,
     "active": 15
-   },
-   "label": "Visuales 11"
+   }
   },
   {
    "type": "clip",
+   "label": "Visuales 12",
    "layer": 1,
    "clip": 12,
    "name": "",
@@ -485,11 +487,11 @@
     "empty": 0,
     "loaded": 7,
     "active": 15
-   },
-   "label": "Visuales 12"
+   }
   },
   {
    "type": "clip",
+   "label": "Visuales 13",
    "layer": 1,
    "clip": 13,
    "name": "",
@@ -498,11 +500,11 @@
     "empty": 0,
     "loaded": 7,
     "active": 15
-   },
-   "label": "Visuales 13"
+   }
   },
   {
    "type": "clip",
+   "label": "Visuales 14",
    "layer": 1,
    "clip": 14,
    "name": "",
@@ -511,11 +513,11 @@
     "empty": 0,
     "loaded": 7,
     "active": 15
-   },
-   "label": "Visuales 14"
+   }
   },
   {
    "type": "clip",
+   "label": "Visuales 15",
    "layer": 1,
    "clip": 15,
    "name": "",
@@ -524,11 +526,11 @@
     "empty": 0,
     "loaded": 7,
     "active": 15
-   },
-   "label": "Visuales 15"
+   }
   },
   {
    "type": "clip",
+   "label": "Visuales 16",
    "layer": 1,
    "clip": 16,
    "name": "",
@@ -537,11 +539,11 @@
     "empty": 0,
     "loaded": 7,
     "active": 15
-   },
-   "label": "Visuales 16"
+   }
   },
   {
    "type": "clip",
+   "label": "Visuales 1",
    "layer": 1,
    "clip": 1,
    "name": "",
@@ -550,11 +552,11 @@
     "empty": 0,
     "loaded": 7,
     "active": 15
-   },
-   "label": "Visuales 1"
+   }
   },
   {
    "type": "clip",
+   "label": "Visuales 2",
    "layer": 1,
    "clip": 2,
    "name": "",
@@ -563,11 +565,11 @@
     "empty": 0,
     "loaded": 7,
     "active": 15
-   },
-   "label": "Visuales 2"
+   }
   },
   {
    "type": "clip",
+   "label": "Visuales 3",
    "layer": 1,
    "clip": 3,
    "name": "",
@@ -576,11 +578,11 @@
     "empty": 0,
     "loaded": 7,
     "active": 15
-   },
-   "label": "Visuales 3"
+   }
   },
   {
    "type": "clip",
+   "label": "Visuales 4",
    "layer": 1,
    "clip": 4,
    "name": "",
@@ -589,11 +591,11 @@
     "empty": 0,
     "loaded": 7,
     "active": 15
-   },
-   "label": "Visuales 4"
+   }
   },
   {
    "type": "clip",
+   "label": "Visuales 5",
    "layer": 1,
    "clip": 5,
    "name": "",
@@ -602,11 +604,11 @@
     "empty": 0,
     "loaded": 7,
     "active": 15
-   },
-   "label": "Visuales 5"
+   }
   },
   {
    "type": "clip",
+   "label": "Visuales 6",
    "layer": 1,
    "clip": 6,
    "name": "",
@@ -615,11 +617,11 @@
     "empty": 0,
     "loaded": 7,
     "active": 15
-   },
-   "label": "Visuales 6"
+   }
   },
   {
    "type": "clip",
+   "label": "Visuales 7",
    "layer": 1,
    "clip": 7,
    "name": "",
@@ -628,11 +630,11 @@
     "empty": 0,
     "loaded": 7,
     "active": 15
-   },
-   "label": "Visuales 7"
+   }
   },
   {
    "type": "clip",
+   "label": "Visuales 8",
    "layer": 1,
    "clip": 8,
    "name": "",
@@ -641,11 +643,11 @@
     "empty": 0,
     "loaded": 7,
     "active": 15
-   },
-   "label": "Visuales 8"
+   }
   },
   {
    "type": "clip",
+   "label": "Cegado blanco",
    "layer": 2,
    "clip": 9,
    "name": "",
@@ -654,11 +656,11 @@
     "empty": 3,
     "loaded": 3,
     "active": 7
-   },
-   "label": "Cegado blanco"
+   }
   },
   {
    "type": "clip",
+   "label": "Cegado rojo",
    "layer": 2,
    "clip": 10,
    "name": "",
@@ -667,11 +669,11 @@
     "empty": 3,
     "loaded": 3,
     "active": 7
-   },
-   "label": "Cegado rojo"
+   }
   },
   {
    "type": "clip",
+   "label": "Cegado naranja",
    "layer": 2,
    "clip": 11,
    "name": "",
@@ -680,11 +682,11 @@
     "empty": 3,
     "loaded": 3,
     "active": 7
-   },
-   "label": "Cegado naranja"
+   }
   },
   {
    "type": "clip",
+   "label": "Cegado amarillo",
    "layer": 2,
    "clip": 12,
    "name": "",
@@ -693,11 +695,11 @@
     "empty": 3,
     "loaded": 3,
     "active": 7
-   },
-   "label": "Cegado amarillo"
+   }
   },
   {
    "type": "clip",
+   "label": "Cegado verde",
    "layer": 2,
    "clip": 13,
    "name": "",
@@ -706,11 +708,11 @@
     "empty": 3,
     "loaded": 3,
     "active": 7
-   },
-   "label": "Cegado verde"
+   }
   },
   {
    "type": "clip",
+   "label": "Cegado cian",
    "layer": 2,
    "clip": 14,
    "name": "",
@@ -719,11 +721,11 @@
     "empty": 3,
     "loaded": 3,
     "active": 7
-   },
-   "label": "Cegado cian"
+   }
   },
   {
    "type": "clip",
+   "label": "Cegado azul",
    "layer": 2,
    "clip": 15,
    "name": "",
@@ -732,11 +734,11 @@
     "empty": 3,
     "loaded": 3,
     "active": 7
-   },
-   "label": "Cegado azul"
+   }
   },
   {
    "type": "clip",
+   "label": "Cegado magenta",
    "layer": 2,
    "clip": 16,
    "name": "",
@@ -745,11 +747,11 @@
     "empty": 3,
     "loaded": 3,
     "active": 7
-   },
-   "label": "Cegado magenta"
+   }
   },
   {
    "type": "clip",
+   "label": "Strobo blanco",
    "layer": 2,
    "clip": 1,
    "name": "",
@@ -758,11 +760,11 @@
     "empty": 10,
     "loaded": 10,
     "active": 7
-   },
-   "label": "Strobo blanco"
+   }
   },
   {
    "type": "clip",
+   "label": "Strobo rojo",
    "layer": 2,
    "clip": 2,
    "name": "",
@@ -771,11 +773,11 @@
     "empty": 10,
     "loaded": 10,
     "active": 7
-   },
-   "label": "Strobo rojo"
+   }
   },
   {
    "type": "clip",
+   "label": "Strobo naranja",
    "layer": 2,
    "clip": 3,
    "name": "",
@@ -784,11 +786,11 @@
     "empty": 10,
     "loaded": 10,
     "active": 7
-   },
-   "label": "Strobo naranja"
+   }
   },
   {
    "type": "clip",
+   "label": "Strobo amarillo",
    "layer": 2,
    "clip": 4,
    "name": "",
@@ -797,11 +799,11 @@
     "empty": 10,
     "loaded": 10,
     "active": 7
-   },
-   "label": "Strobo amarillo"
+   }
   },
   {
    "type": "clip",
+   "label": "Strobo verde",
    "layer": 2,
    "clip": 5,
    "name": "",
@@ -810,11 +812,11 @@
     "empty": 10,
     "loaded": 10,
     "active": 7
-   },
-   "label": "Strobo verde"
+   }
   },
   {
    "type": "clip",
+   "label": "Strobo cian",
    "layer": 2,
    "clip": 6,
    "name": "",
@@ -823,11 +825,11 @@
     "empty": 10,
     "loaded": 10,
     "active": 7
-   },
-   "label": "Strobo cian"
+   }
   },
   {
    "type": "clip",
+   "label": "Strobo azul",
    "layer": 2,
    "clip": 7,
    "name": "",
@@ -836,11 +838,11 @@
     "empty": 10,
     "loaded": 10,
     "active": 7
-   },
-   "label": "Strobo azul"
+   }
   },
   {
    "type": "clip",
+   "label": "Strobo magenta",
    "layer": 2,
    "clip": 8,
    "name": "",
@@ -849,200 +851,199 @@
     "empty": 10,
     "loaded": 10,
     "active": 7
-   },
-   "label": "Strobo magenta"
+   }
   }
  ],
  "bottom": [
   {
    "type": "bypass",
-   "led": {
-    "idle": 0,
-    "active": 2
-   },
    "label": "Bypass Visuales",
    "layers": [
     1
-   ]
-  },
-  {
-   "type": "bypass",
+   ],
    "led": {
     "idle": 0,
     "active": 2
-   },
+   }
+  },
+  {
+   "type": "bypass",
    "label": "Bypass Outline",
    "layers": [
     3
-   ]
-  },
-  {
-   "type": "bypass",
+   ],
    "led": {
     "idle": 0,
     "active": 2
-   },
+   }
+  },
+  {
+   "type": "bypass",
    "label": "Bypass Strobos",
    "layers": [
     2
-   ]
-  },
-  {
-   "type": "bypass",
+   ],
    "led": {
     "idle": 0,
     "active": 2
-   },
+   }
+  },
+  {
+   "type": "bypass",
    "label": "Bypass Pixel",
    "layers": [
     4
-   ]
-  },
-  {
-   "type": "bypass",
+   ],
    "led": {
     "idle": 0,
     "active": 2
-   },
+   }
+  },
+  {
+   "type": "bypass",
    "label": "Bypass Madrix",
    "layers": [
     5
-   ]
+   ],
+   "led": {
+    "idle": 0,
+    "active": 2
+   }
   },
   {
    "type": "none",
+   "label": "",
    "led": {
     "idle": 0,
     "active": 0
-   },
-   "label": ""
+   }
   },
   {
    "type": "prev",
+   "label": "Clip anterior de Visuales",
+   "layer": 1,
    "led": {
     "idle": 0,
     "active": 1
-   },
-   "label": "Clip anterior de Visuales",
-   "layer": 1
+   }
   },
   {
    "type": "next",
+   "label": "Clip siguiente de Visuales",
+   "layer": 1,
    "led": {
     "idle": 0,
     "active": 1
-   },
-   "label": "Clip siguiente de Visuales",
-   "layer": 1
+   }
   }
  ],
  "side": [
   {
    "type": "clearAll",
+   "label": "Limpiar todo",
    "led": {
     "idle": 0,
     "active": 1
-   },
-   "label": "Limpiar todo"
+   }
   },
   {
    "type": "clear",
-   "led": {
-    "idle": 0,
-    "active": 1
-   },
    "label": "Limpiar Strobos",
    "layers": [
     2
-   ]
+   ],
+   "led": {
+    "idle": 0,
+    "active": 1
+   }
   },
   {
    "type": "blackout",
+   "label": "Blackout",
    "led": {
     "idle": 0,
     "active": 2
-   },
-   "label": "Blackout"
+   }
   },
   {
    "type": "clear",
-   "led": {
-    "idle": 0,
-    "active": 1
-   },
    "label": "Limpiar Visuales",
    "layers": [
     1
-   ]
-  },
-  {
-   "type": "clear",
+   ],
    "led": {
     "idle": 0,
     "active": 1
-   },
+   }
+  },
+  {
+   "type": "clear",
    "label": "Limpiar Outline",
    "layers": [
     3
-   ]
-  },
-  {
-   "type": "clear",
+   ],
    "led": {
     "idle": 0,
     "active": 1
-   },
+   }
+  },
+  {
+   "type": "clear",
    "label": "Limpiar Pixel + Madrix",
    "layers": [
     4,
     5
-   ]
-  },
-  {
-   "type": "none",
-   "led": {
-    "idle": 0,
-    "active": 0
-   },
-   "label": ""
-  },
-  {
-   "type": "refresh",
+   ],
    "led": {
     "idle": 0,
     "active": 1
-   },
-   "label": "Refrescar LEDs"
+   }
+  },
+  {
+   "type": "none",
+   "label": "",
+   "led": {
+    "idle": 0,
+    "active": 0
+   }
+  },
+  {
+   "type": "refresh",
+   "label": "Refrescar LEDs",
+   "led": {
+    "idle": 0,
+    "active": 1
+   }
   }
  ],
  "shift": {
   "type": "refresh",
+  "label": "Refrescar LEDs",
   "led": {
    "idle": 0,
    "active": 0
-  },
-  "label": "Refrescar LEDs"
+  }
  },
  "faders": [
   {
    "type": "layerOpacity",
-   "layer": 1,
-   "label": "Visuales"
+   "label": "Visuales",
+   "layer": 1
   },
   {
    "type": "layerOpacity",
-   "layer": 3,
-   "label": "Outline"
+   "label": "Outline",
+   "layer": 3
   },
   {
    "type": "layerOpacity",
-   "layer": 4,
-   "label": "Pixel"
+   "label": "Pixel",
+   "layer": 4
   },
   {
    "type": "layerOpacity",
-   "layer": 5,
-   "label": "Madrix"
+   "label": "Madrix",
+   "layer": 5
   },
   {
    "type": "none",
@@ -1054,16 +1055,17 @@
   },
   {
    "type": "clipSpeed",
+   "label": "Velocidad Outline clip 10",
    "layer": 3,
    "clip": 10,
    "min": 0.25,
    "max": 4,
-   "label": "Velocidad Outline clip 10"
+   "name": ""
   },
   {
    "type": "layerMaster",
-   "layer": 2,
-   "label": "Master Strobos"
+   "label": "Master Strobos",
+   "layer": 2
   },
   {
    "type": "compMaster",
@@ -1076,6 +1078,7 @@
   "repaintEvery": 5,
   "rgbHz": 5,
   "speedMethod": "put",
-  "autoReload": true
+  "autoReload": true,
+  "debug": false
  }
 }

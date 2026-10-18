@@ -5,6 +5,9 @@
 // el script. El mapa se edita con configurador.html. Si no encuentra el archivo, usa el mapa
 // que el configurador dejó incluido al exportar (EMBEDDED_CONFIG).
 //
+// Además de Resolume, cualquier control puede mandar OSC o MIDI a otros módulos de Chataigne
+// ("destinos" del mapa, por ejemplo un módulo MIDI "sunlite" con un puerto loopMIDI).
+//
 // Notas del APC: pads 0-63 (0 = abajo a la izquierda), botones de abajo 100-107,
 // laterales 112-119 (112 = arriba), shift 122, faders CC 48-56.
 //
@@ -28,8 +31,12 @@ var COLORS8 = [3, 5, 9, 13, 21, 37, 45, 53]; // para "Test LEDs"
 var bypassed = [];     // por capa: 1 = bypass puesto desde el APC
 for (var q = 0; q < 100; q++) bypassed.push(0);
 var blackout = 0;
-var oscToggle = [];    // por nota: estado de los controles OSC en modo interruptor
+var oscToggle = [];    // por nota: estado de los controles OSC/MIDI en modo interruptor
 for (var q2 = 0; q2 < 128; q2++) oscToggle.push(0);
+var extraToggle = [];  // nota * 4 + n: estado de las acciones extra en modo interruptor
+for (var q3 = 0; q3 < 512; q3++) extraToggle.push(0);
+var MAX_EXTRA = 4;
+var warnedTargets = [];
 var pendingSpeed = [-1, -1, -1, -1, -1, -1, -1, -1, -1]; // fader -> velocidad por enviar
 var lastSpeed = [-1, -1, -1, -1, -1, -1, -1, -1, -1];
 
@@ -39,6 +46,46 @@ var reloadMap = script.addTrigger("Recargar mapa", "Vuelve a leer apc_config.jso
 
 function resolume() { return root.modules.resolume; }
 function api() { return root.modules.resolumeapi; }
+
+// Módulo de Chataigne al que va una acción OSC o MIDI. Sin destino = "resolume".
+function target(id) {
+	if (!id || id == "resolume") return root.modules.resolume;
+	var m = root.modules[id];
+	if (!m) {
+		for (var i = 0; i < warnedTargets.length; i++) if (warnedTargets[i] == id) return m;
+		warnedTargets.push(id);
+		script.logError("No existe el módulo \"" + id + "\" en Chataigne. Créalo con ese nombre (lo usa el mapa como destino).");
+	}
+	return m;
+}
+
+// Manda una acción OSC o MIDI: on = 1 al activar, 0 al desactivar.
+//   OSC: valor o 0. Nota: note on con su velocity o note off. CC: valor o 0. Program change: solo al activar.
+function sendOut(a, on) {
+	var m = target(a.target);
+	if (!m) return;
+	if (a.type == "osc") { m.send(a.address, on ? a.value : 0); return; }
+	if (a.msg == "cc") m.sendCC(a.channel, a.number, on ? a.value : 0);
+	else if (a.msg == "pc") { if (on) m.sendProgramChange(a.channel, a.number); }
+	else if (on) m.sendNoteOn(a.channel, a.number, a.value);
+	else m.sendNoteOff(a.channel, a.number);
+}
+
+// Acciones extra de un control ("además, enviar..."): pressed = true al pulsar, false al soltar.
+function runExtras(note, d, pressed) {
+	if (!d.extra) return;
+	for (var i = 0; i < d.extra.length && i < MAX_EXTRA; i++) {
+		var a = d.extra[i];
+		var k = note * MAX_EXTRA + i;
+		if (a.mode == "toggle") {
+			if (!pressed) continue;
+			extraToggle[k] = extraToggle[k] ? 0 : 1;
+			sendOut(a, extraToggle[k]);
+		}
+		else if (a.mode == "hold") sendOut(a, pressed ? 1 : 0);
+		else if (pressed) { sendOut(a, 1); sendOut(a, 0); }
+	}
+}
 
 // ---------- mapa ----------
 
@@ -111,8 +158,13 @@ function clearLayer(layer) {
 	resolume().send("/composition/layers/" + layer + "/clear", 1);
 }
 
-// Pulsar un control. Devuelve true si es momentáneo (su LED se apaga al soltar).
 function press(note, d) {
+	pressMain(note, d);
+	runExtras(note, d, true);
+}
+
+// Acción principal de un control.
+function pressMain(note, d) {
 	var t = d.type;
 	var i;
 	if (!t || t == "none") return false;
@@ -136,16 +188,15 @@ function press(note, d) {
 		ctlLed(note, d, blackout);
 		return false;
 	}
-	if (t == "osc") {
-		var value = d.value == undefined ? 1 : d.value;
+	if (t == "osc" || t == "midi") {
 		if (d.mode == "toggle") {
 			oscToggle[note] = oscToggle[note] ? 0 : 1;
-			resolume().send(d.address, oscToggle[note] ? value : 0);
+			sendOut(d, oscToggle[note]);
 			ctlLed(note, d, oscToggle[note]);
 			return false;
 		}
-		resolume().send(d.address, value);
-		if (d.mode != "hold") resolume().send(d.address, 0);
+		sendOut(d, 1);
+		if (d.mode != "hold") sendOut(d, 0);
 		ctlLed(note, d, 1);
 		return true;
 	}
@@ -167,13 +218,14 @@ function press(note, d) {
 
 function release(note, d) {
 	var t = d.type;
-	if (t == "osc" && d.mode == "hold") resolume().send(d.address, 0);
+	if ((t == "osc" || t == "midi") && d.mode == "hold") sendOut(d, 0);
 	if (isMomentary(note, d)) ctlLed(note, d, 0);
+	runExtras(note, d, false);
 }
 
 function isMomentary(note, d) {
 	var t = d.type;
-	if (t == "osc") return d.mode != "toggle";
+	if (t == "osc" || t == "midi") return d.mode != "toggle";
 	if (t == "tap" || t == "resync") return note > 63;
 	return t == "clearAll" || t == "clear" || t == "prev" || t == "next" || t == "refresh";
 }
@@ -242,7 +294,12 @@ function ccEvent(channel, number, value) {
 	else if (t == "osc") {
 		var mn = f.min == undefined ? 0 : f.min;
 		var mx = f.max == undefined ? 1 : f.max;
-		resolume().send(f.address, mn + (mx - mn) * x);
+		var m = target(f.target);
+		if (m) m.send(f.address, mn + (mx - mn) * x);
+	}
+	else if (t == "midiCC") {
+		var mc = target(f.target);
+		if (mc) mc.sendCC(f.channel, f.number, Math.round(f.min + (f.max - f.min) * x));
 	}
 	else if (t == "clipSpeed") {
 		// curva exponencial: con 0,25 y 4 queda 0,25x abajo, 1x en el centro y 4x arriba
@@ -283,14 +340,14 @@ function refresh() {
 		t = d.type;
 		if (t == "clip" || t == "dual" || t == "rgb") continue;
 		if (t == "bypass" || t == "blackout") ctlLed(p, d, 0);
-		else if (t == "osc" && d.mode == "toggle") ctlLed(p, d, oscToggle[p]);
+		else if ((t == "osc" || t == "midi") && d.mode == "toggle") ctlLed(p, d, oscToggle[p]);
 		else if (!t || t == "none") local.sendNoteOn(1, p, 0);
 		else ctlLed(p, d, 0);
 	}
 	for (k = 0; k < 16; k++) {
 		n = k < 8 ? TRACK_FIRST + k : SCENE_FIRST + k - 8;
 		d = defFor(n);
-		if (d.type == "osc" && d.mode == "toggle") ctlLed(n, d, oscToggle[n]);
+		if ((d.type == "osc" || d.type == "midi") && d.mode == "toggle") ctlLed(n, d, oscToggle[n]);
 		else if (!d.type || d.type == "none") local.sendNoteOn(1, n, 0);
 		else ctlLed(n, d, 0);
 	}

@@ -39,6 +39,18 @@ function createRig(opts) {
 		send: function (msg) { out.push("ws " + msg); }
 	});
 
+	// destinos extra: {sunlite: "midi", luces: "osc"}
+	var extra = opts.targets || {};
+	Object.keys(extra).forEach(function (id) {
+		if (extra[id] == "midi") modules[id] = mod(id, {
+			sendNoteOn: function (ch, n, v) { out.push(id + " on " + ch + " " + n + " " + v); },
+			sendNoteOff: function (ch, n) { out.push(id + " off " + ch + " " + n); },
+			sendCC: function (ch, n, v) { out.push(id + " cc " + ch + " " + n + " " + v); },
+			sendProgramChange: function (ch, n) { out.push(id + " pc " + ch + " " + n); }
+		});
+		else modules[id] = mod(id, { send: function (a, v) { out.push(id + " osc " + a + " " + fmt(v)); } });
+	});
+
 	function fmt(v) { return typeof v == "number" ? String(Math.round(v * 10000) / 10000) : JSON.stringify(v); }
 
 	var root = { modules: modules };

@@ -3,9 +3,12 @@
 (function (G) {
 	"use strict";
 
-	G.PAD_TYPES = ["none", "clip", "dual", "osc", "rgb", "tap", "resync", "bypass", "blackout", "clear", "clearAll", "prev", "next", "refresh"];
-	G.BUTTON_TYPES = ["none", "bypass", "clear", "blackout", "clearAll", "prev", "next", "refresh", "tap", "resync", "osc"];
-	G.FADER_TYPES = ["none", "layerOpacity", "layerMaster", "compMaster", "compOpacity", "osc", "clipSpeed"];
+	G.PAD_TYPES = ["none", "clip", "dual", "osc", "midi", "rgb", "tap", "resync", "bypass", "blackout", "clear", "clearAll", "prev", "next", "refresh"];
+	G.BUTTON_TYPES = ["none", "bypass", "clear", "blackout", "clearAll", "prev", "next", "refresh", "tap", "resync", "osc", "midi"];
+	G.FADER_TYPES = ["none", "layerOpacity", "layerMaster", "compMaster", "compOpacity", "osc", "midiCC", "clipSpeed"];
+	G.MAX_EXTRA = 4;
+	// nombres de módulo que ya usa el puente y no pueden ser destinos nuevos
+	G.RESERVED_TARGETS = ["apc", "resolume", "resolumeapi", "resolumews"];
 	G.CONFIG_MARKER = "var EMBEDDED_CONFIG = null; // @@CONFIG@@";
 	G.SCRIPT_NAMES = ["apc_to_resolume.js", "resolume_to_apc.js", "resolume_api.js"];
 
@@ -51,10 +54,14 @@
 			o.layer2 = int(d.layer2, 1, 1); o.clip2 = int(d.clip2, 1, 1); o.name2 = String(d.name2 || "");
 		}
 		if (t == "rgb") o.rgb = ["r", "g", "b"].indexOf(d.rgb) >= 0 ? d.rgb : "r";
-		if (t == "osc") {
-			o.address = String(d.address || "/");
-			o.value = num(d.value, 1);
-			o.mode = ["pulse", "hold", "toggle"].indexOf(d.mode) >= 0 ? d.mode : "pulse";
+		if (t == "osc" || t == "midi") copyAction(o, d, t);
+		if (d.extra && d.extra.length) {
+			o.extra = [];
+			d.extra.slice(0, G.MAX_EXTRA).forEach(function (a) {
+				var x = { type: a.type == "midi" ? "midi" : "osc" };
+				copyAction(x, a, x.type);
+				o.extra.push(x);
+			});
 		}
 		if (t == "bypass" || t == "clear") o.layers = layerList(d.layers, 1);
 		if (t == "prev" || t == "next") o.layer = int(d.layer, 1, 1);
@@ -64,6 +71,33 @@
 		} else {
 			o.led = normButtonLed(d.led);
 		}
+		return o;
+	}
+
+	// Campos de una acción OSC o MIDI (la principal de un control o una extra).
+	function copyAction(o, d, t) {
+		o.target = String(d.target || (t == "osc" ? "resolume" : ""));
+		o.mode = ["pulse", "hold", "toggle"].indexOf(d.mode) >= 0 ? d.mode : "pulse";
+		if (t == "osc") {
+			o.address = String(d.address || "/");
+			o.value = num(d.value, 1);
+		} else {
+			o.msg = ["note", "cc", "pc"].indexOf(d.msg) >= 0 ? d.msg : "note";
+			o.channel = int(d.channel, 1, 1, 16);
+			o.number = int(d.number, 0, 0, 127);
+			o.value = int(d.value, 127, 0, 127);
+		}
+	}
+
+	function normTarget(t) {
+		t = t || {};
+		var o = {
+			id: String(t.id || "").toLowerCase().split("").filter(function (ch) { return /[a-z0-9]/.test(ch); }).join(""),
+			type: t.type == "osc" ? "osc" : "midi",
+			label: String(t.label || "")
+		};
+		if (o.type == "osc") { o.host = String(t.host || "127.0.0.1"); o.port = int(t.port, 8000, 1, 65535); }
+		else o.device = String(t.device || "");
 		return o;
 	}
 
@@ -79,7 +113,11 @@
 			if (o.max <= 0) o.max = 4;
 			o.name = String(f.name || "");
 		}
-		if (t == "osc") { o.address = String(f.address || "/"); o.min = num(f.min, 0); o.max = num(f.max, 1); }
+		if (t == "osc") { o.target = String(f.target || "resolume"); o.address = String(f.address || "/"); o.min = num(f.min, 0); o.max = num(f.max, 1); }
+		if (t == "midiCC") {
+			o.target = String(f.target || ""); o.channel = int(f.channel, 1, 1, 16); o.number = int(f.number, 0, 0, 127);
+			o.min = int(f.min, 0, 0, 127); o.max = int(f.max, 127, 0, 127);
+		}
 		return o;
 	}
 
@@ -94,12 +132,17 @@
 				apiPort: int(c.resolume && c.resolume.apiPort, 8080, 1, 65535)
 			},
 			layers: {},
+			targets: [],
 			pads: [], bottom: [], side: [],
 			shift: null, faders: [],
 			options: {}
 		};
 		var L = c.layers || {};
 		Object.keys(L).forEach(function (k) { if (parseInt(k, 10) > 0 && L[k]) out.layers[String(parseInt(k, 10))] = String(L[k]); });
+		(c.targets || []).forEach(function (t) {
+			var n = normTarget(t);
+			if (n.id && G.RESERVED_TARGETS.indexOf(n.id) < 0 && !out.targets.some(function (x) { return x.id == n.id; })) out.targets.push(n);
+		});
 		for (i = 0; i < 64; i++) out.pads.push(normControl(c.pads && c.pads[i], true));
 		for (i = 0; i < 8; i++) out.bottom.push(normControl(c.bottom && c.bottom[i], false));
 		for (i = 0; i < 8; i++) out.side.push(normControl(c.side && c.side[i], false));
@@ -125,6 +168,28 @@
 		var res = [];
 		function add(level, msg, ref) { res.push({ level: level, msg: msg, ref: ref }); }
 		function oscOk(a) { return typeof a == "string" && a.charAt(0) == "/" && a.length > 1 && a.indexOf(" ") < 0; }
+		var ids = ["resolume"].concat(c.targets.map(function (t) { return t.id; }));
+		function checkAction(a, where, ref) {
+			if (!a || (a.type != "osc" && a.type != "midi")) return;
+			if (a.type == "osc" && !oscOk(a.address)) add("error", where + ": la dirección OSC tiene que empezar por / y no llevar espacios", ref);
+			if (a.type == "midi" && !a.target) add("error", where + ": falta elegir el destino MIDI", ref);
+			else if (ids.indexOf(a.target) < 0) add("error", where + ": el destino «" + a.target + "» no existe (pestaña Destinos)", ref);
+			else if (a.type == "midi" && targetType(a.target) != "midi") add("error", where + ": «" + a.target + "» es un destino OSC, no MIDI", ref);
+			else if (a.type == "osc" && a.target != "resolume" && targetType(a.target) != "osc") add("error", where + ": «" + a.target + "» es un destino MIDI, no OSC", ref);
+		}
+		function targetType(id) { for (var i = 0; i < c.targets.length; i++) if (c.targets[i].id == id) return c.targets[i].type; return id == "resolume" ? "osc" : ""; }
+		function checkControl(d, where, ref) {
+			checkAction(d, where, ref);
+			(d.extra || []).forEach(function (a, k) { checkAction(a, where + " (extra " + (k + 1) + ")", ref); });
+		}
+		c.pads.forEach(function (d, i) { checkControl(d, G.padName(i), { pad: i }); });
+		[["bottom", "Botón de abajo "], ["side", "Botón lateral "]].forEach(function (g) {
+			c[g[0]].forEach(function (d, i) { checkControl(d, g[1] + (i + 1), { group: g[0], index: i }); });
+		});
+		checkControl(c.shift, "Shift", { group: "shift", index: 0 });
+		c.faders.forEach(function (f, i) {
+			if (f.type == "osc" || f.type == "midiCC") checkAction({ type: f.type == "osc" ? "osc" : "midi", target: f.target, address: f.address }, "Fader " + (i + 1), { fader: i });
+		});
 		var seen = {};
 		c.pads.forEach(function (d, i) {
 			var where = G.padName(i);
@@ -133,15 +198,8 @@
 				if (seen[k] !== undefined) add("aviso", where + " lanza el mismo clip que " + G.padName(seen[k]) + " (capa " + d.layer + ", clip " + d.clip + ")", { pad: i });
 				else seen[k] = i;
 			}
-			if (d.type == "osc" && !oscOk(d.address)) add("error", where + ": la dirección OSC tiene que empezar por / y no llevar espacios", { pad: i });
-		});
-		[["bottom", "Botón de abajo "], ["side", "Botón lateral "]].forEach(function (g) {
-			c[g[0]].forEach(function (d, i) {
-				if (d.type == "osc" && !oscOk(d.address)) add("error", g[1] + (i + 1) + ": la dirección OSC tiene que empezar por /", { group: g[0], index: i });
-			});
 		});
 		c.faders.forEach(function (f, i) {
-			if (f.type == "osc" && !oscOk(f.address)) add("error", "Fader " + (i + 1) + ": la dirección OSC tiene que empezar por /", { fader: i });
 			if (f.type == "clipSpeed" && f.min >= f.max) add("error", "Fader " + (i + 1) + ": la velocidad mínima tiene que ser menor que la máxima", { fader: i });
 		});
 		if (composition) G.checkNames(c, composition).forEach(function (r) { res.push(r); });
@@ -231,7 +289,7 @@
 
 	// .noisette a partir del que ya funciona: cambia la ruta de los scripts y añade el módulo
 	// WebSocket "resolumews" si no está. Todo lo demás se deja tal cual.
-	G.buildNoisette = function (template, folder) {
+	G.buildNoisette = function (template, folder, targets) {
 		var n = JSON.parse(JSON.stringify(template));
 		folder = String(folder || "").split("\\").join("/").replace(/\/+$/, "");
 		var SCRIPT_OF = { apc: "apc_to_resolume", resolume: "resolume_to_apc", resolumeapi: "resolume_api" };
@@ -246,7 +304,50 @@
 			});
 		});
 		if (!hasWs) n.modules.items.push(G.WS_MODULE());
+		(targets || []).forEach(function (t, i) {
+			if (n.modules.items.some(function (m) { return m.niceName == t.id; })) return;
+			n.modules.items.push(t.type == "osc" ? G.OSC_TARGET_MODULE(t, 9100 + i) : G.MIDI_TARGET_MODULE(t));
+		});
 		return JSON.stringify(n);
+	};
+
+	// Módulo MIDI de un destino. El puerto se elige en Chataigne (los ids de Windows no se pueden adivinar).
+	G.MIDI_TARGET_MODULE = function (t) {
+		return {
+			parameters: [{ value: true, controlAddress: "/enabled" }],
+			niceName: t.id,
+			type: "MIDI",
+			params: { parameters: [{ value: false, controlAddress: "/autoAdd" }], containers: { pass_through: {} } },
+			templates: { viewOffset: [0, 0], viewZoom: 1.0 },
+			values: {}
+		};
+	};
+
+	G.OSC_TARGET_MODULE = function (t, listenPort) {
+		return {
+			parameters: [{ value: true, controlAddress: "/enabled" }],
+			niceName: t.id,
+			type: "OSC",
+			params: {
+				parameters: [{ value: "Auto", controlAddress: "/networkInterface" }],
+				containers: {
+					oscInput: { parameters: [{ value: listenPort, hexMode: false, controlAddress: "/localPort" }] },
+					oscOutputs: {
+						items: [{
+							parameters: [
+								{ value: t.host, controlAddress: "/remoteHost" },
+								{ value: t.port, hexMode: false, controlAddress: "/remotePort" }
+							],
+							niceName: "OSC Output", type: "BaseItem"
+						}],
+						viewOffset: [0, 0], viewZoom: 1.0
+					},
+					pass_through: {}
+				}
+			},
+			templates: { viewOffset: [0, 0], viewZoom: 1.0 },
+			values: {}
+		};
 	};
 
 	G.WS_MODULE = function () {
@@ -271,7 +372,7 @@
 		opts = opts || {};
 		var files = [{ name: "apc_config.json", text: G.configJSON(c) }];
 		if (opts.scripts !== false) G.SCRIPT_NAMES.forEach(function (n) { files.push({ name: n, text: G.buildScript(templates[n], c) }); });
-		if (opts.noisette && noisetteTemplate) files.push({ name: "APC_Resolume.noisette", text: G.buildNoisette(noisetteTemplate, opts.folder) });
+		if (opts.noisette && noisetteTemplate) files.push({ name: "APC_Resolume.noisette", text: G.buildNoisette(noisetteTemplate, opts.folder, c.targets) });
 		return files;
 	};
 
