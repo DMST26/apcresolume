@@ -27,8 +27,12 @@ function start(opts) {
 		});
 		link = sim.connect((m) => ws.sendBinary(Buffer.from(CS.encodeOSC(m.address, m.args))));
 	});
+	// al cerrar se cortan las conexiones abiertas (si no, close() espera a que se cierren solas)
+	const sockets = new Set();
+	server.on("connection", (sk) => { sockets.add(sk); sk.on("close", () => sockets.delete(sk)); });
+	const close = () => new Promise((r) => { sockets.forEach((sk) => sk.destroy()); server.close(r); });
 	return new Promise((resolve) => {
-		server.listen(opts.port || 0, "127.0.0.1", () => resolve({ port: server.address().port, sim: sim, tree: tree, log: log, close: () => new Promise((r) => server.close(r)) }));
+		server.listen(opts.port || 0, "127.0.0.1", () => resolve({ port: server.address().port, sim: sim, tree: tree, log: log, close: close }));
 	});
 }
 

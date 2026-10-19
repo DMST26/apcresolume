@@ -286,6 +286,42 @@ El remote:
 
 También funciona con doble clic en el propio PC: en ese caso se conecta a `127.0.0.1:8080`.
 
+### Remote con Chataigne (Sunlite, variables, otros programas)
+
+El remote también puede hablar con **Chataigne**. Así la tablet muestra y controla todo lo que tengas vinculado ahí:
+- lo que manda Sunlite u otro programa;
+- tus **variables personalizadas**;
+- **estados** y **secuencias**;
+- los botones de los scripts, como «Refresh LEDs».
+
+En un mismo remote puedes mezclar controles de Resolume y de Chataigne.
+
+**Activarlo en Chataigne (una sola vez).** Ve a **Archivo → Preferencias → OSC Remote Control** y actívalo (puerto **42000**). Viene apagado por defecto. Es el servidor OSCQuery de Chataigne: deja leer todo su árbol de parámetros y cambiar valores por la red.
+
+**En el constructor:**
+1. En **Parámetros**, cambia a **Chataigne**.
+2. Escribe `IP:42000` y pulsa **Leer de Chataigne**. Sin leerlo, se usa un Chataigne de ejemplo con los módulos del puente y tus destinos.
+3. Arrastra lo que quieras. Para cada parámetro se crea el control que le va: un valor con rango crea un fader (o un medidor si es de solo lectura), un sí/no crea un botón o un indicador, un pulsador crea un botón, y una lista crea un selector.
+4. El asistente tiene un paso **5. Chataigne** que monta una página con los grupos que marques.
+
+**Dos piezas pensadas para mostrar información:**
+- **Medidor:** una barra que solo muestra (intensidad, audio, tiempo de una secuencia…).
+- **Indicador:** una luz que se enciende con un sí/no, al pasar un umbral o con una opción concreta.
+
+**Ver lo que manda Sunlite.** Los módulos MIDI de destino que genera el `.noisette` llevan ahora **Auto Add** activado. Así, si Sunlite manda MIDI de vuelta (notas o CC de sus botones y faders), Chataigne lo guarda como valores y el remote los puede mostrar. Tienes que configurar en Sunlite qué manda.
+
+**En la tablet** el remote se abre igual, desde la Root Directory de Resolume. Busca solo a Chataigne en el mismo ordenador, en el puerto 42000; si está en otro, toca el punto de estado o abre el remote con `?chataigne=IP:42000`. Arriba se ven dos puntos de estado, uno para Resolume y otro para Chataigne.
+
+**Cómo habla con Chataigne:**
+
+| Qué | Mensaje |
+|---|---|
+| Leer el árbol | `GET http://IP:42000/` (JSON OSCQuery) |
+| Avisarme de cambios | por WebSocket `ws://IP:42000/`: `{"COMMAND":"LISTEN","DATA":["/customVariables/…/intensidad", true]}`; los cambios llegan como mensajes OSC binarios |
+| Cambiar un valor | `{"/customVariables/…/intensidad": 0.5}` (una lista se manda por el nombre de la opción; un pulsador, con 1) |
+
+> **Alternativa sin el configurador:** Chataigne tiene su propio **Dashboard**, una página web en el puerto de *Project Settings → Dashboard*, normalmente el 9999. Ahí también puedes arrastrar parámetros y abrirlo desde la tablet. Lo que hace este constructor es darte, en un solo archivo, controles pensados para tocar con el dedo, un asistente, Resolume y Chataigne en el mismo remote, y miniaturas de clips.
+
 ### Cómo habla con Resolume
 
 Usa la API oficial de WebSocket (`ws://IP:8080/api/v1`), como el ejemplo oficial de Resolume:
@@ -402,6 +438,9 @@ Si el clip pasa a ir al doble de velocidad, el método PUT funciona.
   - el remote exportado conecta, lanza clips (trigger por id con `true` y `false`), mueve faders y hace tap;
   - recibe los cambios de Resolume y avisa cuando no hay conexión;
   - en el constructor funcionan arrastrar piezas y parámetros, el asistente, el modo Probar y Exportar.
+- **Remote con Chataigne**, probado contra un Chataigne simulado que habla el mismo OSCQuery que el de verdad (comprobado en su código fuente: JSON por HTTP, `LISTEN` por WebSocket y respuestas en OSC binario):
+  - el remote mixto conecta a Resolume y a Chataigne a la vez;
+  - los medidores, indicadores, faders, pulsadores y selectores mandan y reciben valores.
 
 **Por probar en tu equipo, fuera de un show:**
 1. Que los tres scripts cargan `apc_config.json`. Lo verás en el Logger.
@@ -412,6 +451,7 @@ Si el clip pasa a ir al doble de velocidad, el método PUT funciona.
    - que **Leer de Resolume** trae tu composición;
    - que en el modo **Con Resolume** se lanzan clips y se mueven los faders;
    - que el remote se abre desde la **Root Directory** en la tablet.
+6. **Remote con Chataigne 1.10.4:** activa OSC Remote Control y comprueba en el constructor que **Leer de Chataigne** trae tus módulos, y que un fader de una variable personalizada la mueve en Chataigne.
 
 ---
 
@@ -428,6 +468,7 @@ Si el clip pasa a ir al doble de velocidad, el método PUT funciona.
 | R/G/B al 10 % siempre | No hay clip seleccionado en Resolume, o está vacío. Es normal. |
 | «Leer composición» falla | El navegador bloquea leer Resolume desde un archivo local. Usa **Cargar desde archivo…** (ver la pestaña Resolume). |
 | «Guardar en la carpeta» no aparece o falla | Usa Chrome o Edge, o **Descargar ZIP**. |
+| El remote dice «Sin conexión con Chataigne» | Activa **OSC Remote Control** en las Preferencias de Chataigne (puerto 42000) y deja pasar ese puerto en el firewall de Windows. |
 | El remote dice «Sin conexión» | El webserver de Resolume está apagado, la IP no es la correcta (toca el punto de estado para cambiarla) o la tablet no está en la misma red. |
 | La tablet no abre `http://IP:8080/remote.html` | Comprueba que el archivo está en la **Root Directory** de Resolume y que el firewall de Windows deja entrar al puerto 8080. |
 | Un control del remote sale con borde rojo discontinuo | Su parámetro ya no existe en la composición (has borrado o movido una capa o un efecto). Ábrelo en el constructor: el Asistente te dice cuál es. |
@@ -535,11 +576,13 @@ src/
   remote/runtime.js       el remote: conexión WebSocket y controles (lo usan el remote y el constructor)
   remote/layout.js        formato del remote, revisión y asistente que lo genera
   remote/sim.js           Resolume simulado (botón «Probar» y pruebas)
+  remote/chataigne.js     Chataigne por OSCQuery: árbol de parámetros, OSC binario y Chataigne simulado
   remote/remote.html      plantilla del remote exportado (+ remote_app.js)
   app/remote_builder.js   el constructor de remotes
 build.js                  junta todo en configurador.html, chataigne/ y remote-ejemplo.html
 tests/                    pruebas (Node, sin dependencias)
 tests/mock_resolume.js    Resolume de mentira (WebSocket + webserver) para probar remotes sin Resolume
+tests/mock_chataigne.js   Chataigne de mentira (servidor OSCQuery: HTTP + WebSocket con OSC binario)
 ```
 
 ```bash
