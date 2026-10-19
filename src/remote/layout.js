@@ -5,7 +5,7 @@
 //   { format: "resolume-remote", version: 1, name, host, device, cols, rows, accent,
 //     pages: [{ id, name, widgets: [{ id, type, x, y, w, h, label, color, bind, bind2, opts }] }] }
 // x, y, w, h van en celdas de una rejilla de cols × rows que ocupa toda la pantalla.
-(function (L, C) {
+(function (L, C, CS) {
 	"use strict";
 
 	L.DEVICES = {
@@ -15,7 +15,7 @@
 		"tablet-v": { name: "Tablet vertical", cols: 8, rows: 12, w: 700, h: 1024 },
 		"desktop": { name: "Ordenador", cols: 16, rows: 9, w: 1280, h: 720 }
 	};
-	L.WIDGET_TYPES = ["button", "fader", "knob", "xy", "choice", "clipgrid", "columns", "layer", "tempo", "value", "label"];
+	L.WIDGET_TYPES = ["button", "fader", "knob", "xy", "choice", "clipgrid", "columns", "layer", "tempo", "value", "meter", "lamp", "label"];
 	L.MIN_TOUCH = 40; // px: menos que esto cuesta acertar con el dedo
 
 	var nextId = 1;
@@ -66,10 +66,26 @@
 			format: "resolume-remote", version: 1,
 			name: String(l.name || "Mi remote"),
 			host: String(l.host || ""),
+			chataigneHost: String(l.chataigneHost || ""),
 			device: dev, cols: cols, rows: rows,
 			accent: /^#[0-9a-f]{6}$/i.test(l.accent || "") ? l.accent : "#ffb000",
 			pages: pages
 		};
+	};
+
+	// Qué fuentes usa un remote: {resolume, chataigne}
+	L.sources = function (layout) {
+		var r = false, c = false;
+		layout.pages.forEach(function (p) {
+			p.widgets.forEach(function (w) {
+				if (["clipgrid", "columns", "layer", "tempo"].indexOf(w.type) >= 0) r = true;
+				[w.bind, w.bind2].forEach(function (b) {
+					if (!b) return;
+					if (CS.isPath(b)) c = true; else r = true;
+				});
+			});
+		});
+		return { resolume: r, chataigne: c };
 	};
 
 	// Tamaño mínimo razonable de cada tipo (en celdas)
@@ -104,7 +120,7 @@
 	// ---------- comprobaciones (el asistente las enseña mientras diseñas) ----------
 
 	// Devuelve [{level: "error"|"aviso"|"consejo", msg, page, widget, fix?}]
-	L.check = function (layout, comp) {
+	L.check = function (layout, comp, tree) {
 		var res = [];
 		var dev = L.DEVICES[layout.device] || L.DEVICES["tablet-h"];
 		var cellW = dev.w / layout.cols, cellH = dev.h / layout.rows;
@@ -115,12 +131,15 @@
 			if (!p.widgets.length) add("consejo", "La página «" + p.name + "» está vacía: arrastra controles o usa el asistente.", pi);
 			var g = {};
 			p.widgets.forEach(function (w) {
-				var needs = ["button", "fader", "knob", "xy", "choice", "value"].indexOf(w.type) >= 0;
+				var needs = ["button", "fader", "knob", "xy", "choice", "value", "meter", "lamp"].indexOf(w.type) >= 0;
 				if (needs && !w.bind) add("aviso", where(p, w) + ": no está conectado a nada. Arrástrale un parámetro o elígelo en el panel de la derecha.", pi, w);
 				if (w.type == "xy" && !w.bind2) add("aviso", where(p, w) + ": falta el parámetro del eje vertical.", pi, w);
+				[w.bind, w.bind2].forEach(function (b) {
+					if (b && CS.isPath(b) && tree && !CS.resolve(tree, b)) add("error", where(p, w) + ": «" + CS.address(b) + "» no existe en Chataigne (¿has renombrado o borrado el módulo?).", pi, w);
+				});
 				if (comp) {
 					[w.bind, w.bind2].forEach(function (b) {
-						if (b && !C.resolve(comp, b)) add("error", where(p, w) + ": «" + b + "» no existe en la composición actual (¿has borrado o movido una capa?).", pi, w);
+						if (b && !CS.isPath(b) && !C.resolve(comp, b)) add("error", where(p, w) + ": «" + b + "» no existe en la composición actual (¿has borrado o movido una capa?).", pi, w);
 					});
 					if (w.type == "clipgrid" && !C.resolve(comp, "/composition/layers/" + (w.opts.layer || 1) + "/clear")) add("error", where(p, w) + ": la capa " + (w.opts.layer || 1) + " no existe.", pi, w);
 					if (w.type == "layer" && !C.resolve(comp, "/composition/layers/" + (w.opts.layer || 1) + "/clear")) add("error", where(p, w) + ": la capa " + (w.opts.layer || 1) + " no existe.", pi, w);
@@ -147,7 +166,7 @@
 	};
 
 	function typeName(t) {
-		return { button: "Botón", fader: "Fader", knob: "Knob", xy: "Pad XY", choice: "Selector", clipgrid: "Rejilla de clips", columns: "Columnas", layer: "Tira de capa", tempo: "Tempo", value: "Valor", label: "Texto" }[t] || t;
+		return { button: "Botón", fader: "Fader", knob: "Knob", xy: "Pad XY", choice: "Selector", clipgrid: "Rejilla de clips", columns: "Columnas", layer: "Tira de capa", tempo: "Tempo", value: "Valor", meter: "Medidor", lamp: "Indicador", label: "Texto" }[t] || t;
 	}
 	L.typeName = typeName;
 
@@ -186,7 +205,7 @@
 	//   effectsLayer: 1,          página con los efectos de esa capa
 	//   clipControls: true        página con velocidad, dirección, R/G/B... del clip seleccionado de la capa 1
 	// }
-	L.generate = function (comp, choices, device, name) {
+	L.generate = function (comp, choices, device, name, tree) {
 		var dev = L.DEVICES[device] || L.DEVICES["tablet-h"];
 		var cols = dev.cols, rows = dev.rows;
 		var pages = [];
@@ -287,9 +306,37 @@
 			}
 		}
 
+		// Chataigne: lo marcado (variables, valores de destinos como Sunlite, secuencias, estados...)
+		var chPaths = ch.chataignePaths || [];
+		if (chPaths.length && tree) {
+			var pc2 = page("Chataigne");
+			var lastG = "";
+			chPaths.forEach(function (path) {
+				var r = CS.resolve(tree, path);
+				if (!r) return;
+				var n = CS.node(tree, CS.address(path));
+				var vt = r.param.valuetype, ro = r.param.readonly;
+				var t = vt == "ParamEvent" ? "button" : vt == "ParamBoolean" ? (ro ? "lamp" : "button") : vt == "ParamChoice" ? "choice" :
+					vt == "ParamRange" || vt == "ParamInteger" ? (ro ? "meter" : "fader") : "value";
+				var size = { button: [2, 2], lamp: [2, 1], choice: [Math.min(cols, 4), 1], fader: [Math.min(cols, 4), 1], meter: [Math.min(cols, 3), 1], value: [2, 1] }[t];
+				var opts = t == "fader" ? { orientation: "h" } : {};
+				var grp = CS.address(path).split("/").slice(0, -1).join("/");
+				if (grp != lastG) {
+					lastG = grp;
+					var parent = CS.node(tree, grp);
+					if (!put(pc2, { type: "label", w: cols, h: 1, label: (parent && parent.DESCRIPTION) || grp })) pc2 = page("Chataigne " + (pages.length));
+				}
+				if (!put(pc2, { type: t, w: size[0], h: size[1], label: (n && n.DESCRIPTION) || "", bind: path, opts: opts })) {
+					pc2 = page("Chataigne " + pages.length);
+					put(pc2, { type: t, w: size[0], h: size[1], label: (n && n.DESCRIPTION) || "", bind: path, opts: opts });
+				}
+			});
+		}
+
 		if (!pages.length) page("Principal");
 		return L.normalize({ name: name || "Mi remote", device: device, cols: cols, rows: rows, pages: pages });
 	};
 
 })(typeof module != "undefined" && module.exports ? module.exports : (window.RemoteLayout = {}),
-	typeof module != "undefined" && module.exports ? require("./catalog") : window.RemoteCatalog);
+	typeof module != "undefined" && module.exports ? require("./catalog") : window.RemoteCatalog,
+	typeof module != "undefined" && module.exports ? require("./chataigne") : window.ChataigneSource);

@@ -312,12 +312,14 @@
 	};
 
 	// Módulo MIDI de un destino. El puerto se elige en Chataigne (los ids de Windows no se pueden adivinar).
+	// Auto Add activado: lo que mande el programa (p. ej. Sunlite) aparece como valores, y el remote
+	// de Chataigne lo puede mostrar.
 	G.MIDI_TARGET_MODULE = function (t) {
 		return {
 			parameters: [{ value: true, controlAddress: "/enabled" }],
 			niceName: t.id,
 			type: "MIDI",
-			params: { parameters: [{ value: false, controlAddress: "/autoAdd" }], containers: { pass_through: {} } },
+			params: { parameters: [{ value: true, controlAddress: "/autoAdd" }], containers: { pass_through: {} } },
 			templates: { viewOffset: [0, 0], viewZoom: 1.0 },
 			values: {}
 		};

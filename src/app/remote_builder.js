@@ -4,7 +4,7 @@
 (function () {
 	"use strict";
 
-	const C = window.RemoteCatalog, L = window.RemoteLayout, R = window.RemoteRuntime, SIM = window.ResolumeSim;
+	const C = window.RemoteCatalog, L = window.RemoteLayout, R = window.RemoteRuntime, SIM = window.ResolumeSim, CS = window.ChataigneSource;
 	// app.js define window.APCApp después de cargar este archivo: se busca al usarlo
 	const APP = new Proxy({}, { get: (_, k) => window.APCApp[k] });
 	const DATA = window.APP_DATA;
@@ -26,7 +26,9 @@
 		columns: ["▥", "Lanzar columnas enteras."],
 		layer: ["▤", "Una capa completa: opacidad, bypass, solo y vaciar."],
 		tempo: ["♩", "BPM, tap, resync, ÷2 y ×2."],
-		value: ["123", "Muestra un valor: BPM, estado de un clip…"],
+		value: ["123", "Muestra un valor: BPM, estado de un clip, un texto de Chataigne…"],
+		meter: ["▬", "Barra de nivel que solo muestra: audio, intensidad, tiempo de una secuencia…"],
+		lamp: ["●", "Luz que se enciende con un sí/no o cuando un valor pasa de un umbral."],
 		label: ["T", "Un título o una nota."]
 	};
 	const COLORS = ["#ffb000", "#ff5a52", "#38ff5c", "#00a9ff", "#ff00ff", "#ffffff", "#ff7f00", "#8e66ff"];
@@ -41,6 +43,10 @@
 	let history = [], future = [];
 	let showAdvanced = false, search = "";
 	let leftTab = "pieces";
+	let paramSource = store.get("remoteParamSource", "resolume"); // resolume | chataigne
+	let ctree = store.get("chataigneTree", null);
+	let ctreeSource = store.get("chataigneTreeSource", "");
+	let chataigneHost = store.get("chataigneHost", "127.0.0.1:42000");
 	let dirHandle = null;
 
 	function defaultLayout() {
@@ -64,12 +70,21 @@
 		compSource = "ejemplo";
 		return rcomp;
 	}
-	let entriesCache = null, entriesFor = null;
+	// Árbol de Chataigne: el leído o uno de ejemplo con los módulos del puente y los destinos
+	function chataigneTree() {
+		if (ctree) return ctree;
+		ctree = CS.exampleTree(APP.getConfig());
+		ctreeSource = "ejemplo";
+		return ctree;
+	}
+	let entriesCache = null, entriesFor = null, entriesTree = null;
 	function entries() {
-		const comp = composition();
-		if (entriesFor !== comp) { entriesCache = C.walk(comp); entriesFor = comp; }
+		const comp = composition(), tree = chataigneTree();
+		if (entriesFor !== comp || entriesTree !== tree) { entriesCache = C.walk(comp).concat(CS.walk(tree)); entriesFor = comp; entriesTree = tree; }
 		return entriesCache;
 	}
+	function realComp() { return rcomp && compSource != "ejemplo" ? rcomp : null; }
+	function realTree() { return ctree && ctreeSource != "ejemplo" ? ctree : null; }
 
 	// ---------- historial ----------
 
@@ -201,7 +216,7 @@
 		g.style.setProperty("--acc", layout.accent);
 		g.style.setProperty("--cols", layout.cols);
 		g.style.setProperty("--rows", layout.rows);
-		view = R.renderPage(g, layout, page(), mode == "edit" ? null : conn, { composition: composition() });
+		view = R.renderPage(g, layout, page(), mode == "edit" ? null : conn, { composition: composition(), tree: chataigneTree() });
 		if (mode == "edit") {
 			view.nodes.forEach((n) => {
 				const ov = document.createElement("div");
@@ -217,12 +232,12 @@
 				g.appendChild(hint);
 			}
 		}
-		const issues = L.check(layout, rcomp && compSource != "ejemplo" ? rcomp : null).filter((i) => i.page == pageIdx);
+		const issues = L.check(layout, realComp(), realTree()).filter((i) => i.page == pageIdx);
 		$("rbHint").innerHTML = mode == "edit"
 			? (issues.length ? '<span class="warn">⚠ ' + issues.length + " cosas que revisar en esta página (Asistente).</span> " : "") +
 			"Arrastra para mover · esquina inferior derecha para cambiar el tamaño · Supr borra · Ctrl+D duplica · flechas mueven"
 			: mode == "sim" ? "Modo prueba con el simulador: toca los controles. No se manda nada a Resolume."
-				: '<span class="warn">Conectado a Resolume (' + esc(conn && conn.host) + "): los controles mandan de verdad.</span>";
+				: '<span class="warn">Conectado de verdad: los controles mandan a ' + esc([conn && conn.resolume ? "Resolume" : "", conn && conn.chataigne ? "Chataigne" : ""].filter(Boolean).join(" y ")) + ".</span>";
 	}
 
 	// ---------- lienzo: soltar, mover y redimensionar ----------
@@ -412,30 +427,47 @@
 	let paramsKey = null;
 	function renderParams(force) {
 		const el = $("rbParams");
-		const key = [entriesFor && entriesFor.name && entriesFor.name.value, compSource, search, showAdvanced, entries().length].join("|");
+		const key = [entriesFor && entriesFor.name && entriesFor.name.value, compSource, ctreeSource, paramSource, search, showAdvanced, entries().length].join("|");
 		if (!force && key == paramsKey && el.innerHTML) return;
 		paramsKey = key;
-		const list = entries().filter((e) => (showAdvanced || !e.advanced) && (!search || (e.group + " " + e.label + " " + e.path).toLowerCase().indexOf(search.toLowerCase()) >= 0));
+		const isCha = paramSource == "chataigne";
+		const list = entries().filter((e) => (e.source == "chataigne") == isCha && (showAdvanced || !e.advanced) && (!search || (e.group + " " + e.label + " " + e.path).toLowerCase().indexOf(search.toLowerCase()) >= 0));
 		const groups = [];
 		const byGroup = {};
 		list.forEach((e) => { if (!byGroup[e.group]) { byGroup[e.group] = []; groups.push(e.group); } byGroup[e.group].push(e); });
-		const src = compSource == "ejemplo" || !compSource
-			? '<p class="warn" style="font-size:12px">Usando una composición de ejemplo hecha con tu mapa. Lee la de Resolume para tener todos los efectos y parámetros reales.</p>'
-			: '<p class="ok" style="font-size:12px">Composición: ' + esc(compSource) + "</p>";
-		el.innerHTML = src +
-			'<div class="row"><button class="small" id="rbRead">Leer de Resolume</button><button class="small" id="rbLoad">Cargar archivo…</button></div>' +
+		const seg = '<div class="seg" id="rbSrc" style="margin-bottom:8px"><button data-src="resolume"' + (isCha ? "" : ' class="on"') + '>Resolume</button><button data-src="chataigne"' + (isCha ? ' class="on"' : "") + ">Chataigne</button></div>";
+		let src;
+		if (!isCha) {
+			src = (compSource == "ejemplo" || !compSource
+				? '<p class="warn" style="font-size:12px">Usando una composición de ejemplo hecha con tu mapa. Lee la de Resolume para tener todos los efectos y parámetros reales.</p>'
+				: '<p class="ok" style="font-size:12px">Composición: ' + esc(compSource) + "</p>") +
+				'<div class="row"><button class="small" id="rbRead">Leer de Resolume</button><button class="small" id="rbLoad">Cargar archivo…</button></div>';
+		} else {
+			src = (ctreeSource == "ejemplo" || !ctreeSource
+				? '<p class="warn" style="font-size:12px">Usando un Chataigne de ejemplo. Léelo de verdad para ver tus módulos (Sunlite, Resolume…), variables, estados y secuencias.</p>'
+				: '<p class="ok" style="font-size:12px">Chataigne: ' + esc(ctreeSource) + "</p>") +
+				'<div class="row"><input type="text" id="rbChaHost" value="' + esc(chataigneHost) + '" title="IP:puerto del OSC Remote Control de Chataigne"><button class="small fixed" id="rbReadCha">Leer de Chataigne</button></div>' +
+				'<p class="hint">En Chataigne: <strong>Archivo → Preferencias → OSC Remote Control</strong>, actívalo (puerto 42000).</p>';
+		}
+		el.innerHTML = seg + src +
 			'<div class="row" style="margin:8px 0"><input type="text" id="rbSearch" placeholder="Buscar: opacidad, blur, tap…" value="' + esc(search) + '"></div>' +
 			'<label class="check" style="margin-bottom:8px"><input type="checkbox" id="rbAdv"' + (showAdvanced ? " checked" : "") + "> Mostrar avanzados</label>" +
 			'<p class="hint">Arrástralos a un hueco (crea el control) o encima de un control (lo conecta). Clic = conectar al control elegido.</p>' +
 			'<div id="rbTree">' + (groups.length ? "" : '<p class="dim">Nada coincide con la búsqueda.</p>') +
 			groups.map((g) => {
-				const open = search || groups.length < 6 || /^(Composición|Tempo|Crossfader)$/.test(g);
+				const open = search || groups.length < 8 || /^(Composición|Tempo|Crossfader)$|^Chataigne › Variables/.test(g);
 				return "<details" + (open ? " open" : "") + "><summary>" + esc(g) + ' <span class="dim">' + byGroup[g].length + "</span></summary>" +
 					byGroup[g].map((e) => '<div class="rb-param" draggable="true" data-path="' + esc(e.path) + '" title="' + esc(e.path + (C.HELP[e.key] ? "\n" + C.HELP[e.key] : "")) + '">' +
 						"<span>" + esc(e.label) + '</span><span class="vt">' + esc(vtName(e.valuetype)) + "</span></div>").join("") + "</details>";
 			}).join("") + "</div>";
-		$("rbRead").onclick = readFromResolume;
-		$("rbLoad").onclick = () => APP.openCompositionFile();
+		$("rbSrc").onclick = (e) => { const b = e.target.closest("[data-src]"); if (b) { paramSource = b.dataset.src; store.set("remoteParamSource", paramSource); renderParams(true); } };
+		if (!isCha) {
+			$("rbRead").onclick = readFromResolume;
+			$("rbLoad").onclick = () => APP.openCompositionFile();
+		} else {
+			$("rbChaHost").onchange = (e) => { chataigneHost = e.target.value.trim() || "127.0.0.1:42000"; store.set("chataigneHost", chataigneHost); };
+			$("rbReadCha").onclick = readFromChataigne;
+		}
 		const s = $("rbSearch");
 		s.oninput = () => { search = s.value; const pos = s.selectionStart; renderParams(true); const n = $("rbSearch"); n.focus(); n.setSelectionRange(pos, pos); };
 		$("rbAdv").onchange = (e) => { showAdvanced = e.target.checked; renderParams(true); };
@@ -449,6 +481,24 @@
 				else addWidget({ path: p.dataset.path });
 			});
 		});
+	}
+
+	async function readFromChataigne() {
+		try {
+			toast("Leyendo Chataigne en " + chataigneHost + "…");
+			const r = await fetch("http://" + chataigneHost + "/", { cache: "no-store" });
+			const tree = await r.json();
+			if (!tree || !tree.CONTENTS) throw new Error("no parece Chataigne");
+			ctree = tree;
+			ctreeSource = chataigneHost + " · " + new Date().toLocaleTimeString();
+			if (!store.set("chataigneTree", ctree)) store.set("chataigneTree", null);
+			store.set("chataigneTreeSource", ctreeSource);
+			entriesFor = null; paramsKey = null;
+			render();
+			toast("Chataigne leído: " + CS.walk(ctree).length + " parámetros.");
+		} catch (e) {
+			toast("No se pudo leer Chataigne en " + chataigneHost + ". ¿Está abierto con OSC Remote Control activado (Preferencias)?", true);
+		}
 	}
 
 	async function readFromResolume() {
@@ -496,6 +546,19 @@
 
 	// ---------- asistente paso a paso ----------
 
+	// Grupos de parámetros de Chataigne que tiene sentido poner en una tablet
+	let chaGroups = {};
+	function chataigneStep() {
+		chaGroups = {};
+		CS.walk(chataigneTree()).filter((e) => !e.advanced).forEach((e) => { (chaGroups[e.group] = chaGroups[e.group] || []).push(e.path); });
+		const names = Object.keys(chaGroups);
+		if (!names.length) return "";
+		const pre = (g) => /Variables|Secuencias|Estados/.test(g) || APP.getConfig().targets.some((t) => g.indexOf("› " + t.id + " ›") >= 0 || g.endsWith("› " + t.id));
+		return '<div class="box"><strong>5. Chataigne</strong><div class="hint">' + (ctreeSource == "ejemplo" ? "Chataigne de ejemplo: lee el tuyo en Parámetros → Chataigne para ver lo real. " : "") +
+			"Valores de los destinos (Sunlite…), variables, estados y secuencias. Se crea una página con lo que marques.</div>" +
+			'<div class="rb-checks" style="grid-template-columns:1fr">' + names.map((g, i) => '<label class="check"><input type="checkbox" name="wzCha" value="' + esc(g) + '"' + (pre(g) ? " checked" : "") + "> " + esc(g.replace(/^Chataigne › /, "")) + ' <span class="dim">' + chaGroups[g].length + "</span></label>").join("") + "</div></div>";
+	}
+
 	function openWizard() {
 		const comp = composition();
 		const dlg = $("rbDialog");
@@ -513,6 +576,7 @@
 			'<div class="box"><strong>4. Más páginas (opcional)</strong>' +
 			'<div class="row"><label class="check fixed"><input type="checkbox" id="wzFx"> Efectos de la capa</label><select id="wzFxLayer">' + layerOpts + "</select></div>" +
 			'<div class="row"><label class="check fixed"><input type="checkbox" id="wzClipCtl"> Velocidad y dirección de los clips de la capa</label><select id="wzClipLayer">' + layerOpts + "</select></div></div>" +
+			chataigneStep() +
 			'<label class="check"><input type="checkbox" id="wzAppend"> Añadir como páginas nuevas (sin borrar lo que ya tengo)</label>' +
 			'<div class="row" style="margin-top:14px"><button id="wzCancel">Cancelar</button><button class="primary" id="wzOk">Crear remote</button></div>';
 		const vals = (name) => Array.from(dlg.querySelectorAll('input[name="' + name + '"]:checked')).map((i) => parseInt(i.value, 10));
@@ -522,10 +586,11 @@
 				clipLayers: vals("wzClips"), clipsPerLayer: parseInt($("wzPer").value, 10) || 8, columns: $("wzCols").checked,
 				mixLayers: vals("wzMix"), tempo: $("wzTempo").checked, master: $("wzMaster").checked,
 				effectsLayer: $("wzFx").checked ? parseInt($("wzFxLayer").value, 10) : 0,
-				clipControls: $("wzClipCtl").checked, clipControlsLayer: parseInt($("wzClipLayer").value, 10)
+				clipControls: $("wzClipCtl").checked, clipControlsLayer: parseInt($("wzClipLayer").value, 10),
+				chataignePaths: Array.from(dlg.querySelectorAll('input[name="wzCha"]:checked')).reduce((a, i) => a.concat(chaGroups[i.value] || []), [])
 			};
 			const device = $("wzDevice").value;
-			const made = L.generate(comp, choices, device, $("wzName").value.trim() || "Mi remote");
+			const made = L.generate(comp, choices, device, $("wzName").value.trim() || "Mi remote", chataigneTree());
 			const append = $("wzAppend").checked && device == layout.device;
 			if (!append && layout.pages.some((p) => p.widgets.length) && !confirm("Esto sustituye el remote actual (Ctrl+Z para deshacer). ¿Seguir?")) return;
 			commit(() => {
@@ -601,6 +666,11 @@
 			h += field("Orientación", '<select data-opt="orientation">' + [["v", "Vertical"], ["h", "Horizontal"]].map((x) => '<option value="' + x[0] + '"' + ((o.orientation || "v") == x[0] ? " selected" : "") + ">" + x[1] + "</option>").join("") + "</select>");
 			h += '<label class="check"><input type="checkbox" data-opt="showValue" data-t="bool"' + (o.showValue !== false ? " checked" : "") + "> Mostrar el valor</label>";
 		}
+		if (w.type == "meter") h += field("Orientación", '<select data-opt="orientation">' + [["h", "Horizontal"], ["v", "Vertical"]].map((x) => '<option value="' + x[0] + '"' + ((o.orientation || "h") == x[0] ? " selected" : "") + ">" + x[1] + "</option>").join("") + "</select>");
+		if (w.type == "lamp" && e) {
+			if (e.valuetype == "ParamChoice") h += field("Se enciende con", '<select data-opt="index" data-t="int">' + (e.options || []).map((x, i) => '<option value="' + i + '"' + ((o.index || 0) == i ? " selected" : "") + ">" + esc(x) + "</option>").join("") + "</select>");
+			else if (e.valuetype != "ParamBoolean") h += field("Se enciende por encima de", '<input type="number" step="any" data-opt="threshold" data-t="num" value="' + (o.threshold != null ? o.threshold : (e.max != null ? (e.min + e.max) / 2 : 0)) + '">');
+		}
 		if (w.type == "clipgrid") {
 			h += field("Capa", layerSelect("layer", o.layer || 1));
 			h += '<div class="row">' + nIn("first", "Primer clip", o.first || 1) + nIn("count", "Cuántos", o.count || 8, 1, 64) + nIn("cols", "Por fila", o.cols || 8, 1, 16) + "</div>";
@@ -657,7 +727,9 @@
 			field("Color principal", '<div class="quick">' + COLORS.map((c) => '<div data-acc="' + c + '" class="' + (layout.accent == c ? "on" : "") + '" style="background:' + c + '"></div>').join("") + "</div>") +
 			field("Rejilla (columnas × filas)", '<div class="row"><input type="number" id="rbCols" min="2" max="32" value="' + layout.cols + '"><input type="number" id="rbRows" min="2" max="32" value="' + layout.rows + '"></div>', "Al cambiarla se reescala todo.") +
 			field("Dirección de Resolume por defecto", '<input type="text" id="rbHost" value="' + esc(layout.host) + '" placeholder="Automática">',
-				"Vacío = automática: si el remote se abre desde el webserver de Resolume se conecta a ese mismo ordenador. En el remote, tocando el punto de estado se puede cambiar.");
+				"Vacío = automática: si el remote se abre desde el webserver de Resolume se conecta a ese mismo ordenador. En el remote, tocando el punto de estado se puede cambiar.") +
+			field("Dirección de Chataigne por defecto", '<input type="text" id="rbChaHostL" value="' + esc(layout.chataigneHost) + '" placeholder="Automática (mismo ordenador, puerto 42000)">',
+				"Solo se usa si el remote tiene controles de Chataigne.");
 		$("rbPageName").onchange = (e) => commit(() => { page().name = e.target.value.trim() || "Página"; });
 		$("rbPageLeft").onclick = () => movePage(-1);
 		$("rbPageRight").onclick = () => movePage(1);
@@ -675,6 +747,7 @@
 		el.querySelectorAll("[data-acc]").forEach((c) => { c.onclick = () => commit(() => { layout.accent = c.dataset.acc; }); });
 		$("rbCols").onchange = $("rbRows").onchange = () => commit(() => L.rescale(layout, parseInt($("rbCols").value, 10) || layout.cols, parseInt($("rbRows").value, 10) || layout.rows));
 		$("rbHost").onchange = (e) => commit(() => { layout.host = e.target.value.trim(); });
+		$("rbChaHostL").onchange = (e) => commit(() => { layout.chataigneHost = e.target.value.trim(); });
 	}
 	function movePage(d) {
 		const j = pageIdx + d;
@@ -714,14 +787,21 @@
 		if (m == "live") {
 			const cfg = APP.getConfig();
 			const host = layout.host || cfg.resolume.host + ":" + cfg.resolume.apiPort;
-			if (!confirm("Vas a conectar el remote con Resolume en " + host + ".\nLo que toques se manda de verdad. ¿Seguir?")) { render(); return; }
+			const u = L.sources(layout);
+			const what = [u.resolume || !u.chataigne ? "Resolume (" + host + ")" : "", u.chataigne ? "Chataigne (" + (layout.chataigneHost || chataigneHost) + ")" : ""].filter(Boolean).join(" y ");
+			if (!confirm("Vas a conectar el remote con " + what + ".\nLo que toques se manda de verdad. ¿Seguir?")) { render(); return; }
 			stopConn();
-			conn = new R.Connection({ host: host, onComposition: () => renderCanvas(), onStatus: (ok) => { if (!ok) $("rbHint").innerHTML = '<span class="err">Sin conexión con ' + esc(host) + ". Reintentando…</span>"; } });
+			const uses = L.sources(layout);
+			const chHost = layout.chataigneHost || chataigneHost;
+			const res = uses.resolume || !uses.chataigne ? new R.Connection({ host: host, onComposition: () => renderCanvas(), onStatus: (ok) => { if (!ok) $("rbHint").innerHTML = '<span class="err">Sin conexión con Resolume (' + esc(host) + "). Reintentando…</span>"; } }) : null;
+			const cha = uses.chataigne ? new R.ChataigneConnection({ host: chHost, onTree: () => renderCanvas(), onStatus: (ok) => { if (!ok) $("rbHint").innerHTML = '<span class="err">Sin conexión con Chataigne (' + esc(chHost) + "). Reintentando…</span>"; } }) : null;
+			conn = R.MultiConnection(res, cha);
 			conn.connect();
 		} else if (m == "sim") {
 			stopConn();
-			const sim = SIM.create(clone(composition()));
-			conn = new R.Connection({ sim: sim, onComposition: () => renderCanvas() });
+			const res = new R.Connection({ sim: SIM.create(clone(composition())), onComposition: () => renderCanvas() });
+			const cha = new R.ChataigneConnection({ sim: CS.sim(clone(chataigneTree())), onTree: () => renderCanvas() });
+			conn = R.MultiConnection(res, cha);
 			conn.connect();
 		} else stopConn();
 		mode = m;
@@ -741,7 +821,7 @@
 		const dlg = $("rbDialog");
 		const lib = store.get("remotes", {});
 		const names = Object.keys(lib).sort();
-		const errors = L.check(layout, rcomp && compSource != "ejemplo" ? rcomp : null).filter((i) => i.level == "error");
+		const errors = L.check(layout, realComp(), realTree()).filter((i) => i.level == "error");
 		const file = store.get("remoteFile", "remote.html");
 		dlg.innerHTML = "<h2>Exportar «" + esc(layout.name) + "»</h2>" +
 			(errors.length ? '<p class="err">Hay ' + errors.length + " errores (pestaña Asistente). Puedes exportar igualmente.</p>" : "") +

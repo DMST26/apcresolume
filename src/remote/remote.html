@@ -20,7 +20,8 @@ body { display: flex; flex-direction: column; padding: env(safe-area-inset-top) 
 #tabs button.on { background: var(--acc, #ffb000); border-color: var(--acc, #ffb000); color: #111; font-weight: 600; }
 #status { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #9aa0a8; white-space: nowrap; cursor: pointer; }
 #status i { width: 10px; height: 10px; border-radius: 50%; background: #ff5a52; display: inline-block; }
-#status.ok i { background: #4cd06a; }
+#status i.ok { background: #4cd06a; }
+#status b { font-weight: 400; margin-right: 6px; }
 #page { flex: 1; min-height: 0; padding: 6px; }
 #overlay { position: fixed; inset: auto 0 0 0; padding: 8px 12px; background: #ff5a52e6; color: #111; font-weight: 600; text-align: center; display: none; }
 #overlay.show { display: block; }
@@ -31,13 +32,14 @@ body { display: flex; flex-direction: column; padding: env(safe-area-inset-top) 
 <div id="bar">
 	<span class="title" id="title"></span>
 	<div id="tabs"></div>
-	<span id="status" title="Cambiar la dirección de Resolume"><i></i><span id="statusText">Conectando…</span></span>
+	<span id="status" title="Cambiar las direcciones"></span>
 	<button id="full" title="Pantalla completa">⛶</button>
 </div>
 <div id="page"></div>
 <div id="overlay"></div>
 <script>window.REMOTE_LAYOUT = /*@@LAYOUT@@*/null;</script>
 <script>/*@@CATALOG@@*/</script>
+<script>/*@@CHATAIGNE@@*/</script>
 <script>/*@@RUNTIME@@*/</script>
 <script>/*@@APP@@*/</script>
 </body>

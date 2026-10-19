@@ -5,6 +5,7 @@
 	"use strict";
 
 	const C = window.RemoteCatalog;
+	const CS = window.ChataigneSource;
 
 	// ---------- conexión ----------
 
@@ -101,6 +102,139 @@
 		};
 	};
 
+	// Chataigne por su servidor OSCQuery. host = "ip:puerto" (42000 por defecto).
+	R.ChataigneConnection = function (opts) {
+		const self = this;
+		let ws = null, simLink = null, retry = 1000, timer = null, closed = false, refetch = null;
+		self.tree = null;
+		self.connected = false;
+		self.host = opts.host;
+		const params = {}, listeners = {}, listening = {};
+
+		function setTree(tree) {
+			self.tree = tree;
+			(function index(n) {
+				if (!n || typeof n != "object") return;
+				if (n.CONTENTS) { Object.keys(n.CONTENTS).forEach((k) => index(n.CONTENTS[k])); return; }
+				const p = CS.param(n);
+				if (p) params[p.id] = Object.assign(params[p.id] || {}, p);
+			})(tree);
+			if (opts.onTree) opts.onTree(tree);
+		}
+		function fetchTree() {
+			if (opts.sim) { setTree(opts.sim.tree()); return Promise.resolve(); }
+			return fetch("http://" + self.host + "/", { cache: "no-store" }).then((r) => r.json()).then(setTree).catch(() => {});
+		}
+		function update(addr, args) {
+			const id = CS.PREFIX + addr, p = params[id];
+			if (!p) return;
+			const v = CS.valueFromArgs(p, args);
+			if (v === undefined) return;
+			if (p.valuetype == "ParamChoice") { p.value = v; p.index = Math.max(0, (p.options || []).indexOf(v)); }
+			else p.value = v;
+			(listeners[id] || []).forEach((fn) => fn(p));
+		}
+		function onMessage(data) {
+			if (typeof data == "string") {
+				try {
+					const m = JSON.parse(data);
+					if (/^PATH_/.test(m.COMMAND)) { clearTimeout(refetch); refetch = setTimeout(fetchTree, 500); }
+				} catch (e) { /* nada */ }
+				return;
+			}
+			const m = data.address ? data : CS.decodeOSC(data);
+			if (m) update(m.address, m.args);
+		}
+		function send(obj) {
+			if (simLink) { simLink.receive(JSON.parse(JSON.stringify(obj))); return; }
+			if (ws && ws.readyState == 1) ws.send(JSON.stringify(obj));
+		}
+		function listen(id) { send({ COMMAND: "LISTEN", DATA: [CS.address(id), true] }); }
+
+		self.connect = function () {
+			closed = false;
+			if (opts.sim) {
+				simLink = opts.sim.connect((m) => setTimeout(() => onMessage(JSON.parse(JSON.stringify(m))), 0));
+				self.connected = true;
+				fetchTree();
+				Object.keys(listening).forEach(listen);
+				if (opts.onStatus) opts.onStatus(true);
+				return;
+			}
+			try { ws = new WebSocket("ws://" + self.host + "/"); } catch (e) { schedule(); return; }
+			ws.binaryType = "arraybuffer";
+			ws.onopen = () => {
+				self.connected = true;
+				retry = 1000;
+				fetchTree().then(() => Object.keys(listening).forEach(listen));
+				if (opts.onStatus) opts.onStatus(true);
+			};
+			ws.onmessage = (e) => onMessage(e.data);
+			ws.onclose = ws.onerror = () => {
+				if (ws) ws.onclose = ws.onerror = null;
+				const was = self.connected;
+				self.connected = false;
+				if (was || !timer) { if (opts.onStatus) opts.onStatus(false); }
+				schedule();
+			};
+		};
+		function schedule() {
+			if (closed || timer) return;
+			timer = setTimeout(() => { timer = null; self.connect(); }, retry);
+			retry = Math.min(retry * 2, 8000);
+		}
+		self.close = function () {
+			closed = true;
+			clearTimeout(timer); timer = null;
+			if (ws) { ws.onclose = ws.onerror = null; try { ws.close(); } catch (e) { /* ya cerrado */ } ws = null; }
+			if (simLink) { simLink.close(); simLink = null; }
+			self.connected = false;
+		};
+		self.param = (id) => params[id];
+		self.on = function (id, fn) {
+			(listeners[id] = listeners[id] || []).push(fn);
+			if (!listening[id]) { listening[id] = true; listen(id); }
+			return () => { const l = listeners[id]; if (l) l.splice(l.indexOf(fn), 1); };
+		};
+		self.clearListeners = function () { Object.keys(listeners).forEach((k) => { listeners[k] = []; }); };
+		self.set = function (id, v) {
+			const p = params[id];
+			if (!p) return;
+			if (p.valuetype == "ParamEvent" && !v) return; // los pulsadores de Chataigne solo cuentan al pulsar
+			const out = {};
+			out[CS.address(id)] = CS.outgoing(p, v);
+			send(out);
+		};
+	};
+
+	// Une una conexión con Resolume y otra con Chataigne (cualquiera de las dos puede faltar).
+	// Los ids de Resolume son números y los de Chataigne "chataigne:/ruta".
+	R.MultiConnection = function (res, cha) {
+		const pick = (id) => (CS && CS.isPath(String(id)) ? cha : res);
+		const both = [res, cha].filter(Boolean);
+		return {
+			resolume: res, chataigne: cha,
+			get composition() { return res ? res.composition : null; },
+			get tree() { return cha ? cha.tree : null; },
+			get host() { return res ? res.host : cha && cha.host; },
+			connect: () => both.forEach((c) => c.connect()),
+			close: () => both.forEach((c) => c.close()),
+			clearListeners: () => both.forEach((c) => c.clearListeners()),
+			param: (id) => { const c = pick(id); return c ? c.param(id) : null; },
+			on: (id, fn) => { const c = pick(id); return c ? c.on(id, fn) : () => {}; },
+			set: (id, v) => { const c = pick(id); if (c) c.set(id, v); },
+			reset: (id) => { const c = pick(id); if (c && c.reset) c.reset(id); },
+			trigger: (path, v) => { if (res) res.trigger(path, v); },
+			thumbUrl: (clip) => (res ? res.thumbUrl(clip) : "")
+		};
+	};
+
+	// Resuelve una ruta de Resolume o de Chataigne
+	R.resolve = function (comp, tree, path) {
+		if (CS && CS.isPath(path)) return CS.resolve(tree, path);
+		return C.resolve(comp, path);
+	};
+
 	// Lee la composición una vez por WebSocket (funciona también desde un archivo local, sin CORS).
 	R.fetchComposition = function (host, timeoutMs) {
 		return new Promise((resolve, reject) => {
@@ -124,7 +258,7 @@
 	// ---------- controles ----------
 
 	R.TYPES = {
-		button: { name: "Botón", w: 2, h: 2, accepts: ["Action", "ParamEvent", "ParamBoolean", "ParamRange", "ParamChoice"] },
+		button: { name: "Botón", w: 2, h: 2, accepts: ["Action", "ParamEvent", "ParamBoolean", "ParamRange", "ParamInteger", "ParamNumber", "ParamChoice"] },
 		fader: { name: "Fader", w: 1, h: 4, accepts: ["ParamRange", "ParamInteger"] },
 		knob: { name: "Knob", w: 2, h: 2, accepts: ["ParamRange", "ParamInteger"] },
 		xy: { name: "Pad XY", w: 4, h: 4, accepts: ["ParamRange"] },
@@ -133,16 +267,19 @@
 		columns: { name: "Columnas", w: 8, h: 1, accepts: [] },
 		layer: { name: "Tira de capa", w: 2, h: 6, accepts: [] },
 		tempo: { name: "Tempo", w: 4, h: 2, accepts: [] },
-		value: { name: "Valor", w: 2, h: 1, accepts: ["ParamRange", "ParamInteger", "ParamChoice", "ParamString", "ParamText", "ParamBoolean"] },
+		value: { name: "Valor", w: 2, h: 1, accepts: ["ParamRange", "ParamInteger", "ParamNumber", "ParamChoice", "ParamString", "ParamText", "ParamBoolean", "ParamColor"] },
+		meter: { name: "Medidor", w: 3, h: 1, accepts: ["ParamRange", "ParamInteger"] },
+		lamp: { name: "Indicador", w: 2, h: 1, accepts: ["ParamBoolean", "ParamRange", "ParamInteger", "ParamNumber", "ParamChoice"] },
 		label: { name: "Texto", w: 4, h: 1, accepts: [] }
 	};
 
 	// Control adecuado para un tipo de parámetro (al arrastrar un parámetro al lienzo)
 	R.typeFor = function (entry) {
 		if (!entry) return "button";
-		if (entry.valuetype == "ParamRange" || entry.valuetype == "ParamInteger") return entry.key == "phase" ? "fader" : "fader";
+		if (entry.valuetype == "ParamRange" || entry.valuetype == "ParamInteger") return entry.readonly ? "meter" : "fader";
 		if (entry.valuetype == "ParamChoice") return entry.key == "connected" ? "value" : "choice";
-		if (entry.valuetype == "ParamString" || entry.valuetype == "ParamText") return "value";
+		if (entry.valuetype == "ParamString" || entry.valuetype == "ParamText" || entry.valuetype == "ParamNumber" || entry.valuetype == "ParamColor") return "value";
+		if (entry.readonly && entry.valuetype == "ParamBoolean") return "lamp";
 		return "button";
 	};
 
@@ -157,9 +294,11 @@
 		if (!p) return "—";
 		if (p.valuetype == "ParamChoice") return p.value;
 		if (p.valuetype == "ParamBoolean") return p.value ? "On" : "Off";
+		if (p.valuetype == "ParamColor") return String(p.value || "");
 		if (typeof p.value == "number") {
 			const units = p.view && p.view.display_units;
-			const v = Math.abs(p.max - p.min) <= 2 ? p.value.toFixed(2) : (Math.abs(p.value) >= 100 ? p.value.toFixed(1) : p.value.toFixed(2));
+			const small = p.max != null && Math.abs(p.max - p.min) <= 2;
+			const v = Number.isInteger(p.value) ? String(p.value) : small ? p.value.toFixed(2) : (Math.abs(p.value) >= 100 ? p.value.toFixed(1) : p.value.toFixed(2));
 			return v + (units ? " " + units : "");
 		}
 		return String(p.value == null ? "" : p.value);
@@ -264,6 +403,43 @@
 		node.querySelector(".rw-name").textContent = w.label || ctx.labelOf(w.bind);
 		const big = node.querySelector(".rw-big");
 		const update = () => { big.textContent = b.id != null ? fmt(ctx.param(b.id)) : "—"; };
+		if (b.id != null) ctx.watch(b.id, update);
+		return { node: node, update: update, missing: !b.ok && !!w.bind };
+	};
+
+	// Barra de nivel (solo muestra)
+	W.meter = function (w, ctx) {
+		const b = bind(ctx, w.bind);
+		const vert = (w.opts || {}).orientation == "v";
+		const node = el("div", "rw-meter" + (vert ? " v" : ""), '<span class="rw-name"></span><div class="rw-bar"><div class="rw-level"></div></div><span class="rw-num"></span>');
+		node.querySelector(".rw-name").textContent = w.label || ctx.labelOf(w.bind) || "Medidor";
+		const lvl = node.querySelector(".rw-level"), num = node.querySelector(".rw-num");
+		const update = () => {
+			const p = b.id != null ? ctx.param(b.id) : null;
+			const x = p ? norm(p) : 0.5;
+			if (vert) lvl.style.height = x * 100 + "%"; else lvl.style.width = x * 100 + "%";
+			num.textContent = p ? fmt(p) : "";
+		};
+		if (b.id != null) ctx.watch(b.id, update);
+		return { node: node, update: update, missing: !b.ok && !!w.bind };
+	};
+
+	// Luz que se enciende con un sí/no, con un valor por encima de un umbral o con una opción concreta
+	W.lamp = function (w, ctx) {
+		const o = w.opts || {};
+		const b = bind(ctx, w.bind);
+		const node = el("div", "rw-lamp", '<i></i><span class="rw-name"></span>');
+		node.querySelector(".rw-name").textContent = w.label || ctx.labelOf(w.bind) || "Indicador";
+		const update = () => {
+			const p = b.id != null ? ctx.param(b.id) : null;
+			let on = false;
+			if (p) {
+				if (p.valuetype == "ParamBoolean") on = !!p.value;
+				else if (p.valuetype == "ParamChoice") on = p.index == (o.index || 0);
+				else on = Number(p.value) > (o.threshold != null ? Number(o.threshold) : (p.max != null ? (p.min + p.max) / 2 : 0));
+			}
+			node.classList.toggle("on", on);
+		};
 		if (b.id != null) ctx.watch(b.id, update);
 		return { node: node, update: update, missing: !b.ok && !!w.bind };
 	};
@@ -531,6 +707,7 @@
 	R.renderPage = function (container, layout, page, conn, opts) {
 		opts = opts || {};
 		const comp = (conn && conn.composition) || opts.composition || null;
+		const tree = (conn && conn.tree) || opts.tree || null;
 		const watchers = [];
 		// sin conexión (editor) los valores salen de la composición tal cual
 		const local = {};
@@ -540,10 +717,11 @@
 			if (typeof o.valuetype == "string" && o.id !== undefined) local[o.id] = o;
 			Object.keys(o).forEach((k) => { if (k != "options") index(o[k]); });
 		})(comp);
+		if (!conn && tree && CS) CS.walk(tree).forEach((e) => { const r = CS.resolve(tree, e.path); if (r) local[r.param.id] = r.param; });
 		const ctx = {
-			resolve: (path) => C.resolve(comp, path),
+			resolve: (path) => R.resolve(comp, tree, path),
 			param: (id) => (conn ? conn.param(id) : local[id]) || null,
-			labelOf: (path) => labelOf(comp, path),
+			labelOf: (path) => labelOf(comp, path, tree),
 			watch: (id, fn) => { if (conn) watchers.push(conn.on(id, fn)); },
 			set: (id, v) => { if (conn) conn.set(id, v); },
 			reset: (id) => { if (conn) conn.reset(id); },
@@ -570,8 +748,12 @@
 	};
 
 	// Nombre corto de una ruta, para etiquetas automáticas
-	function labelOf(comp, path) {
+	function labelOf(comp, path, tree) {
 		if (!path) return "";
+		if (CS && CS.isPath(path)) {
+			const n = CS.node(tree, CS.address(path));
+			return (n && n.DESCRIPTION) || CS.address(path).split("/").pop();
+		}
 		const parts = String(path).split("/").filter(Boolean).map((s) => decodeURIComponent(s));
 		const last = parts[parts.length - 1];
 		if (last == "connect" && parts[1] == "layers") {
@@ -639,6 +821,16 @@
 .rw-row{display:flex;gap:4px;flex:1;min-height:0}
 .rw-row > .rw{flex:1}
 .rw-layer{display:flex;flex-direction:column;gap:4px;padding:4px}
+.rw-meter{display:flex;flex-direction:column;justify-content:center;gap:4px;padding:6px 8px}
+.rw-bar{position:relative;flex:1;max-height:22px;min-height:8px;background:#101113;border-radius:4px;overflow:hidden}
+.rw-level{position:absolute;left:0;top:0;bottom:0;background:var(--acc);border-radius:4px;transition:width .08s,height .08s}
+.rw-meter.v .rw-bar{max-height:none}
+.rw-meter.v .rw-level{top:auto;right:0;width:auto !important}
+.rw-meter .rw-num{font-size:11px;color:var(--acc)}
+.rw-lamp{display:flex;align-items:center;gap:8px;padding:6px 10px}
+.rw-lamp i{flex-shrink:0;width:18px;height:18px;border-radius:50%;background:#2b2e33;border:1px solid #3a3e45}
+.rw-lamp.on i{background:var(--acc);border-color:var(--acc);box-shadow:0 0 10px var(--acc)}
+.rw-lamp .rw-name{color:#e8e9eb;font-size:12px;white-space:normal}
 .rw-layer > .rw-fader{flex:1;border:0}
 .rw-layer .rw-row{flex:0 0 34%}
 .rw-layer .rw-row{flex-direction:column}

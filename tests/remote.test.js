@@ -118,5 +118,58 @@ ok("asistente: móvil sin errores", L.check(phone, comp).filter((i) => i.level =
 const res = L.rescale(JSON.parse(JSON.stringify(gen)), 6, 10);
 ok("reescalar: todo dentro", res.pages.every((p) => p.widgets.every((w) => w.x + w.w <= 6 && w.y + w.h <= 10)));
 
+// ---------- Chataigne ----------
+const CS = require("../src/remote/chataigne");
+const tree = CS.exampleTree({ targets: [{ id: "sunlite", type: "midi" }, { id: "luces", type: "osc" }] });
+const ce = CS.walk(tree);
+const cfind = (addr) => ce.filter((e) => e.path == "chataigne:" + addr)[0];
+ok("chataigne: variables con rango", cfind("/customVariables/show/variables/intensidad").valuetype == "ParamRange");
+ok("chataigne: opciones (enum)", cfind("/customVariables/show/variables/modo").valuetype == "ParamChoice" && cfind("/customVariables/show/variables/modo").options.length == 3);
+ok("chataigne: sí/no y pulsadores", cfind("/states/intro/active").valuetype == "ParamBoolean" && cfind("/sequences/show/playSequence").valuetype == "ParamEvent");
+ok("chataigne: número sin rango", cfind("/modules/resolume/values/composition_bypassed").valuetype == "ParamNumber");
+ok("chataigne: valores de los destinos (Sunlite)", !!cfind("/modules/sunlite/values/cc1") && /Módulos › sunlite › Valores/.test(cfind("/modules/sunlite/values/cc1").group));
+ok("chataigne: nombres de grupo", /^Chataigne › Variables/.test(cfind("/customVariables/show/variables/intensidad").group));
+const rp = CS.resolve(tree, "chataigne:/customVariables/show/variables/modo");
+ok("chataigne: resolver", rp && rp.param.id == "chataigne:/customVariables/show/variables/modo" && rp.param.index == 0);
+ok("chataigne: lo que no existe = null", CS.resolve(tree, "chataigne:/modules/nada/values/x") === null);
+
+// OSC binario: ida y vuelta
+[["/a/b", [0.5]], ["/x", [7]], ["/texto", ["hola ñ"]], ["/b", [true]], ["/varios", [1, 0.25, "z"]]].forEach((c) => {
+	const d = CS.decodeOSC(CS.encodeOSC(c[0], c[1]));
+	const want = c[1].map((v) => (v === true ? 1 : v));
+	ok("osc: " + c[0], d.address == c[0] && d.args.length == want.length && d.args.every((v, i) => typeof v == "number" ? Math.abs(v - want[i]) < 1e-6 : v == want[i]), JSON.stringify(d));
+});
+ok("osc: lo que no es OSC = null", CS.decodeOSC(new Uint8Array([1, 2, 3]).buffer) === null);
+ok("osc: sí/no llega como 0/1", CS.valueFromArgs({ valuetype: "ParamBoolean" }, [1]) === true && CS.valueFromArgs({ valuetype: "ParamBoolean" }, [0]) === false);
+ok("osc: valor que sale para un enum", CS.outgoing({ valuetype: "ParamChoice", options: ["A", "B"] }, 1) == "B");
+
+// simulador
+const csim = CS.sim(JSON.parse(JSON.stringify(tree)));
+const cgot = [];
+const clink = csim.connect((m) => cgot.push(m));
+clink.receive({ COMMAND: "LISTEN", DATA: ["/customVariables/show/variables/intensidad", true] });
+ok("chataigne sim: LISTEN con valor actual", cgot.length == 1 && cgot[0].args[0] == 0.8);
+clink.receive({ "/customVariables/show/variables/intensidad": 5 });
+ok("chataigne sim: set recortado al rango y aviso", cgot[1].args[0] == 1);
+csim.set("/states/intro/active", false);
+ok("chataigne sim: sin LISTEN no avisa", cgot.length == 2);
+
+// remote mixto
+const mixed = L.normalize({ pages: [{ widgets: [
+	{ type: "fader", x: 0, y: 0, w: 1, h: 4, bind: "/composition/master" },
+	{ type: "meter", x: 2, y: 0, w: 3, h: 1, bind: "chataigne:/customVariables/show/variables/intensidad" },
+	{ type: "lamp", x: 2, y: 1, w: 2, h: 1, bind: "chataigne:/modules/nada/values/x" }
+] }] });
+ok("fuentes: detecta Resolume y Chataigne", JSON.stringify(L.sources(mixed)) == '{"resolume":true,"chataigne":true}');
+ok("fuentes: solo Chataigne", JSON.stringify(L.sources(L.normalize({ pages: [{ widgets: [{ type: "value", bind: "chataigne:/a" }] }] }))) == '{"resolume":false,"chataigne":true}');
+const mi = L.check(mixed, comp, tree);
+ok("revisión: ruta de Chataigne que no existe", mi.some((i) => /no existe en Chataigne/.test(i.msg)));
+ok("revisión: sin árbol no se juzgan las de Chataigne", !L.check(mixed, comp, null).some((i) => /Chataigne/.test(i.msg)));
+const gch = L.generate(comp, { chataignePaths: ce.filter((e) => !e.advanced).map((e) => e.path) }, "tablet-h", "Ch", tree);
+const gw = gch.pages.reduce((a, p) => a.concat(p.widgets), []);
+ok("asistente: página de Chataigne", gch.pages.some((p) => /^Chataigne/.test(p.name)) && gw.some((w) => w.type == "fader" && w.bind == "chataigne:/customVariables/show/variables/intensidad") &&
+	gw.some((w) => w.type == "button" && w.bind == "chataigne:/sequences/show/playSequence") && gw.some((w) => w.type == "choice"));
+ok("asistente: Chataigne sin solapes", L.check(gch, comp, tree).filter((i) => i.level == "error" || /encima/.test(i.msg)).length == 0, JSON.stringify(L.check(gch, comp, tree).slice(0, 3)));
+
 console.log("\nComprobaciones: " + checks + ", fallos: " + failures);
 process.exit(failures ? 1 : 0);

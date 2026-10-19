@@ -8,6 +8,8 @@ const path = require("path");
 const fs = require("fs");
 const { chromium } = require("playwright");
 const mock = require("../mock_resolume");
+const mockCha = require("../mock_chataigne");
+const L = require("../../src/remote/layout");
 
 const ROOT = path.join(__dirname, "..", "..");
 const SHOTS = process.argv[2] || null;
@@ -31,8 +33,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 		const errors = [];
 		page.on("pageerror", (e) => errors.push(e.message));
 		await page.goto("http://127.0.0.1:" + m.port + "/remote-ejemplo.html");
-		await page.waitForSelector("#status.ok", { timeout: 5000 });
-		ok("remote: conecta solo con el Resolume que lo sirve", await page.textContent("#statusText") == "127.0.0.1:" + m.port);
+		await page.waitForSelector("#status i.ok", { timeout: 5000 });
+		ok("remote: conecta solo con el Resolume que lo sirve", (await page.textContent("#status")) == "Resolume" && await page.evaluate(() => window.REMOTE.conn.host) == "127.0.0.1:" + m.port);
 		await sleep(300);
 		await shot(page, "r1_clips");
 		const clips = await page.$$(".rw-clipgrid .rw-clip");
@@ -167,11 +169,95 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 		// el exportado funciona servido por «Resolume»
 		const p3 = await browser.newPage({ viewport: { width: 1024, height: 700 } });
 		await p3.goto("http://127.0.0.1:" + m.port + "/tests/e2e/remote-exportado.html");
-		await p3.waitForSelector("#status.ok", { timeout: 5000 });
+		await p3.waitForSelector("#status i.ok", { timeout: 5000 });
 		await sleep(300);
 		ok("exportado: conecta y dibuja", (await p3.$$(".rw")).length > 5);
 		await shot(p3, "r3_exportado");
 		fs.unlinkSync(out);
+
+		// ---------- remote mixto: Resolume + Chataigne ----------
+		const cm = await mockCha.start({});
+		try {
+			const V = "chataigne:/customVariables/show/variables/";
+			const mixed = L.normalize({ name: "Mixto", pages: [{ name: "Show", widgets: [
+				{ type: "fader", x: 0, y: 0, w: 1, h: 4, label: "Master", bind: "/composition/master" },
+				{ type: "meter", x: 2, y: 0, w: 4, h: 1, label: "Intensidad", bind: V + "intensidad" },
+				{ type: "fader", x: 2, y: 1, w: 4, h: 1, label: "Intensidad", bind: V + "intensidad", opts: { orientation: "h" } },
+				{ type: "lamp", x: 2, y: 2, w: 2, h: 1, label: "Intro", bind: "chataigne:/states/intro/active" },
+				{ type: "button", x: 6, y: 0, w: 2, h: 2, label: "Play", bind: "chataigne:/sequences/show/playSequence" },
+				{ type: "choice", x: 2, y: 3, w: 6, h: 1, label: "Modo", bind: V + "modo" },
+				{ type: "value", x: 8, y: 0, w: 2, h: 1, label: "CC1 Sunlite", bind: "chataigne:/modules/sunlite/values/cc1" }
+			] }] });
+			const html = fs.readFileSync(path.join(ROOT, "remote-ejemplo.html"), "utf8").replace(/window\.REMOTE_LAYOUT = .*?;<\/script>/, () => "window.REMOTE_LAYOUT = " + JSON.stringify(mixed) + ";</script>");
+			const mixFile = path.join(ROOT, "tests", "e2e", "remote-mixto.html");
+			fs.writeFileSync(mixFile, html);
+			const p4 = await browser.newPage({ viewport: { width: 1024, height: 700 } });
+			const e4 = [];
+			p4.on("pageerror", (e) => e4.push(e.message));
+			await p4.goto("http://127.0.0.1:" + m.port + "/tests/e2e/remote-mixto.html?chataigne=127.0.0.1:" + cm.port);
+			await p4.waitForFunction(() => document.querySelectorAll("#status i.ok").length == 2, null, { timeout: 6000 });
+			ok("mixto: conecta con Resolume y con Chataigne", true);
+			await sleep(400);
+			await shot(p4, "r4_mixto");
+			ok("mixto: el medidor muestra el valor de Chataigne", /0\.80/.test(await p4.textContent(".rw-meter .rw-num")));
+			ok("mixto: pide avisos (LISTEN) de lo que usa", cm.log.filter((x) => x.COMMAND == "LISTEN").length >= 5);
+			cm.log.length = 0;
+			const hf = await p4.$(".rw-fader.h .rw-track");
+			const hb = await hf.boundingBox();
+			await p4.mouse.click(hb.x + hb.width * 0.25, hb.y + hb.height / 2);
+			await sleep(250);
+			const setI = cm.log.filter((x) => x[V.replace("chataigne:", "") + "intensidad"] !== undefined);
+			ok("mixto: fader de Chataigne manda el valor en JSON", setI.length >= 1 && Math.abs(setI[setI.length - 1][V.replace("chataigne:", "") + "intensidad"] - 0.25) < 0.06, JSON.stringify(cm.log));
+			ok("mixto: y vuelve al medidor", /0\.2/.test(await p4.textContent(".rw-meter .rw-num")));
+			cm.log.length = 0;
+			const play = await p4.$('.rw-button:has(.rw-name:text-is("Play"))');
+			await play.dispatchEvent("pointerdown", { button: 0, pointerId: 5 });
+			await play.dispatchEvent("pointerup", { button: 0, pointerId: 5 });
+			await sleep(150);
+			ok("mixto: pulsador de Chataigne se manda una vez", JSON.stringify(cm.log) == JSON.stringify([{ "/sequences/show/playSequence": 1 }]), JSON.stringify(cm.log));
+			cm.log.length = 0;
+			const drop = await p4.$('.rw-opt:text-is("Drop")');
+			await drop.dispatchEvent("pointerdown", { button: 0, pointerId: 6 });
+			await drop.dispatchEvent("pointerup", { button: 0, pointerId: 6 });
+			await sleep(150);
+			ok("mixto: selector manda la opción por su nombre", JSON.stringify(cm.log) == JSON.stringify([{ "/customVariables/show/variables/modo": "Drop" }]), JSON.stringify(cm.log));
+			ok("mixto: la opción queda marcada", await drop.evaluate((n) => n.classList.contains("on")));
+			ok("mixto: indicador encendido", await p4.$eval(".rw-lamp", (n) => n.classList.contains("on")));
+			cm.sim.set("/states/intro/active", false);
+			cm.sim.set("/modules/sunlite/values/cc1", 64);
+			await sleep(200);
+			ok("mixto: cambios de Chataigne llegan (indicador y valor de Sunlite)", !(await p4.$eval(".rw-lamp", (n) => n.classList.contains("on"))) && /64/.test(await p4.textContent(".rw-value .rw-big")));
+			ok("mixto: sin errores de JavaScript", e4.length == 0, e4.join(" | "));
+			fs.unlinkSync(mixFile);
+
+			// constructor leyendo de Chataigne
+			const b2 = await browser.newPage({ viewport: { width: 1500, height: 900 } });
+			const e5 = [];
+			b2.on("pageerror", (e) => e5.push(e.message));
+			b2.on("dialog", (d) => d.accept());
+			await b2.goto("file://" + path.join(ROOT, "configurador.html"));
+			await b2.click('#modeSeg [data-mode="remote"]');
+			await b2.click('#rbTabs [data-lt="params"]');
+			await b2.click('#rbSrc [data-src="chataigne"]');
+			await b2.fill("#rbChaHost", "127.0.0.1:" + cm.port);
+			await b2.dispatchEvent("#rbChaHost", "change");
+			await b2.click("#rbReadCha");
+			await sleep(500);
+			ok("constructor: lee Chataigne", /Chataigne: 127\.0\.0\.1/.test(await b2.textContent("#rbParams")) && /Intensidad/.test(await b2.textContent("#rbTree")));
+			await b2.fill("#rbSearch", "Intensidad");
+			await sleep(150);
+			await b2.dragAndDrop('.rb-param[data-path="chataigne:/customVariables/show/variables/intensidad"]', "#rbFrame", { targetPosition: { x: 100, y: 100 } });
+			await sleep(150);
+			const lay2 = await b2.evaluate(() => window.RemoteBuilder.layout());
+			ok("constructor: arrastrar un parámetro de Chataigne", lay2.pages[0].widgets.some((w) => w.bind == "chataigne:/customVariables/show/variables/intensidad"));
+			await b2.click('#rbMode [data-m="sim"]');
+			await sleep(300);
+			await shot(b2, "b5_chataigne");
+			ok("constructor: probar con Chataigne simulado", (await b2.$$("#rbGrid .rw")).length >= 1);
+			ok("constructor (Chataigne): sin errores de JavaScript", e5.length == 0, e5.join(" | "));
+		} finally {
+			await cm.close();
+		}
 	} finally {
 		await browser.close();
 		await m.close();

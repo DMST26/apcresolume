@@ -38,12 +38,14 @@ const noisette = JSON.parse(read(SRC, "noisette_template.json"));
 
 const catalogJs = inline(read(SRC, "remote", "catalog.js"), "catalog.js");
 const runtimeJs = inline(read(SRC, "remote", "runtime.js"), "runtime.js");
+const chataigneJs = inline(read(SRC, "remote", "chataigne.js"), "chataigne.js");
 // el CSS de los controles está en runtime.js (R.CSS); se copia también al <style> para que se vea
 // antes de que cargue el script
 const runtimeCss = /R\.CSS = `([\s\S]*?)`;/.exec(runtimeJs)[1];
 const remoteTemplate = fill(read(SRC, "remote", "remote.html"), {
 	"/*@@CSS@@*/": runtimeCss,
 	"/*@@CATALOG@@*/": catalogJs,
+	"/*@@CHATAIGNE@@*/": chataigneJs,
 	"/*@@RUNTIME@@*/": runtimeJs,
 	"/*@@APP@@*/": inline(read(SRC, "remote", "remote_app.js"), "remote_app.js")
 }, "remote.html");
@@ -55,6 +57,7 @@ if (remoteTemplate.indexOf("/*@@LAYOUT@@*/null") < 0) throw new Error("Falta la 
 let html = fill(read(SRC, "app", "configurador.html"), {
 	"/*@@GENERATOR@@*/": inline(read(SRC, "generator.js"), "generator.js"),
 	"/*@@CATALOG@@*/": catalogJs,
+	"/*@@CHATAIGNE@@*/": chataigneJs,
 	"/*@@SIM@@*/": inline(read(SRC, "remote", "sim.js"), "sim.js"),
 	"/*@@LAYOUTJS@@*/": inline(read(SRC, "remote", "layout.js"), "layout.js"),
 	"/*@@RUNTIME@@*/": runtimeJs,

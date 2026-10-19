@@ -1,25 +1,30 @@
 // Arranque del remote exportado (remote.html).
 (function () {
 	"use strict";
-	const R = window.RemoteRuntime;
+	const R = window.RemoteRuntime, CS = window.ChataigneSource;
 	const layout = window.REMOTE_LAYOUT;
 	const $ = (id) => document.getElementById(id);
 	const store = {
 		get(k) { try { return localStorage.getItem("remote." + k); } catch (e) { return null; } },
 		set(k, v) { try { localStorage.setItem("remote." + k, v); } catch (e) { /* sin almacenamiento */ } }
 	};
+	const query = new URLSearchParams(location.search);
+	const served = /^https?:$/.test(location.protocol) && location.host;
 
-	// Dirección de Resolume, por orden:
-	// ?host=ip:puerto  >  la que elegiste en este aparato  >  la del propio Resolume si el remote
-	// se abre desde su webserver  >  la del remote  >  127.0.0.1:8080
-	function pickHost() {
-		const q = new URLSearchParams(location.search).get("host");
-		if (q) return q;
-		const saved = store.get("host");
-		if (saved) return saved;
-		if (/^https?:$/.test(location.protocol) && location.host) return location.host;
-		return layout.host || "127.0.0.1:8080";
+	// Qué usa el diseño: Resolume (clips, capas, parámetros de la composición) y/o Chataigne
+	const uses = { resolume: false, chataigne: false };
+	layout.pages.forEach((p) => p.widgets.forEach((w) => {
+		if (["clipgrid", "columns", "layer", "tempo"].indexOf(w.type) >= 0) uses.resolume = true;
+		[w.bind, w.bind2].forEach((b) => { if (b) { if (CS.isPath(b)) uses.chataigne = true; else uses.resolume = true; } });
+	}));
+
+	// Direcciones, por orden: ?host= / ?chataigne=  >  las elegidas en este aparato  >  las del diseño  >
+	// el ordenador desde el que se sirve el remote  >  este mismo ordenador
+	function pickHost(key, param, def, port) {
+		return query.get(param) || store.get(key) || def || (served ? location.hostname + ":" + port : "127.0.0.1:" + port);
 	}
+	const resHost = query.get("host") || store.get("host") || layout.host || (served ? location.host : "127.0.0.1:8080");
+	const chaHost = pickHost("chataigneHost", "chataigne", layout.chataigneHost, 42000);
 
 	let current = 0;
 	try { current = Math.min(layout.pages.length - 1, parseInt(store.get("page:" + layout.name) || "0", 10) || 0); } catch (e) { current = 0; }
@@ -28,16 +33,21 @@
 	document.title = layout.name;
 	$("title").textContent = layout.name;
 
-	const conn = new R.Connection({
-		host: pickHost(),
-		onComposition: () => render(),
-		onStatus: (ok) => {
-			$("status").classList.toggle("ok", ok);
-			$("statusText").textContent = ok ? conn.host : "Sin conexión";
-			$("overlay").textContent = ok ? "" : "Sin conexión con Resolume (" + conn.host + "). Reintentando… Revisa que el Webserver esté activado.";
-			$("overlay").classList.toggle("show", !ok);
-		}
-	});
+	const state = {};
+	function status() {
+		const parts = [];
+		if (uses.resolume) parts.push('<i class="' + (state.resolume ? "ok" : "") + '"></i><b>Resolume</b>');
+		if (uses.chataigne) parts.push('<i class="' + (state.chataigne ? "ok" : "") + '"></i><b>Chataigne</b>');
+		$("status").innerHTML = parts.join("");
+		const down = [];
+		if (uses.resolume && !state.resolume) down.push("Resolume (" + resHost + ", activa el Webserver)");
+		if (uses.chataigne && !state.chataigne) down.push("Chataigne (" + chaHost + ", activa OSC Remote Control en Preferencias)");
+		$("overlay").textContent = down.length ? "Sin conexión con " + down.join(" y ") + ". Reintentando…" : "";
+		$("overlay").classList.toggle("show", down.length > 0);
+	}
+	const res = uses.resolume ? new R.Connection({ host: resHost, onComposition: () => render(), onStatus: (ok) => { state.resolume = ok; status(); } }) : null;
+	const cha = uses.chataigne ? new R.ChataigneConnection({ host: chaHost, onTree: () => render(), onStatus: (ok) => { state.chataigne = ok; status(); } }) : null;
+	const conn = R.MultiConnection(res, cha);
 
 	function tabs() {
 		$("tabs").innerHTML = "";
@@ -54,14 +64,25 @@
 		if (view) view.destroy();
 		conn.clearListeners();
 		view = R.renderPage($("page"), layout, layout.pages[current], conn);
-		// mientras no hay composición no se marcan como «no encontrado»
-		if (!conn.composition) view.nodes.forEach((n) => n.node.classList.remove("missing"));
+		// mientras no han llegado los datos no se marcan como «no encontrado»
+		view.nodes.forEach((n) => {
+			const b = n.w.bind || "";
+			const ready = CS.isPath(b) ? conn.tree : conn.composition;
+			if (!ready) n.node.classList.remove("missing");
+		});
 	}
 
 	$("status").onclick = () => {
-		const h = prompt("Dirección de Resolume (IP:puerto). Vacío = automática.", conn.host);
-		if (h === null) return;
-		store.set("host", h.trim());
+		if (uses.resolume) {
+			const h = prompt("Dirección de Resolume (IP:puerto). Vacío = automática.", resHost);
+			if (h === null) return;
+			store.set("host", h.trim());
+		}
+		if (uses.chataigne) {
+			const h = prompt("Dirección de Chataigne (IP:puerto, normalmente 42000). Vacío = automática.", chaHost);
+			if (h === null) return;
+			store.set("chataigneHost", h.trim());
+		}
 		location.reload();
 	};
 	$("full").onclick = () => {
@@ -78,8 +99,9 @@
 	document.addEventListener("visibilitychange", () => { if (document.visibilityState == "visible") keepAwake(); });
 	document.addEventListener("contextmenu", (e) => e.preventDefault());
 
+	status();
 	tabs();
 	render();
 	conn.connect();
-	window.REMOTE = { conn: conn, layout: layout };
+	window.REMOTE = { conn: conn, layout: layout, uses: uses };
 })();
