@@ -4,6 +4,8 @@ Configurador visual para el **Akai APC mini mk2** en directo con **Resolume Aren
 
 Con el configurador decides qué hace cada pad, botón y fader, de qué color y cómo se enciende cada LED, y a qué programa va cada mensaje, todo sin tocar código. Después exportas, y Chataigne aplica el mapa nuevo solo en unos 2 segundos.
 
+Además incluye un **constructor de Resolume Remote**: diseñas arrastrando tu propio mando para el móvil o la tablet, conectado directamente a la API de Resolume y sin pasar por Chataigne. Ver [Resolume Remote](#resolume-remote).
+
 ```
             MIDI                     OSC  ───────────►  Resolume Arena (7000)
  APC mini mk2 ──────►  Chataigne  ◄──── OSC (7001) ◄──  estado de clips, tempo
@@ -23,11 +25,12 @@ Con el configurador decides qué hace cada pad, botón y fader, de qué color y 
 4. [Uso diario: cambiar el mapa](#uso-diario-cambiar-el-mapa)
 5. [El configurador](#el-configurador)
 6. [Sunlite y otros programas](#sunlite-y-otros-programas)
-7. [Cómo funciona por dentro](#cómo-funciona-por-dentro)
-8. [Velocidad de clip (el fader 7)](#velocidad-de-clip-el-fader-7)
-9. [Solución de problemas](#solución-de-problemas)
-10. [Referencia técnica](#referencia-técnica)
-11. [Desarrollo](#desarrollo)
+7. [Resolume Remote](#resolume-remote)
+8. [Cómo funciona por dentro](#cómo-funciona-por-dentro)
+9. [Velocidad de clip (el fader 7)](#velocidad-de-clip-el-fader-7)
+10. [Solución de problemas](#solución-de-problemas)
+11. [Referencia técnica](#referencia-técnica)
+12. [Desarrollo](#desarrollo)
 
 ---
 
@@ -47,7 +50,8 @@ A partir de ahí, para cambiar el mapa basta con editarlo y volver a guardar. Ch
 
 | Ruta | Qué es |
 |---|---|
-| `configurador.html` | **La aplicación.** Un solo archivo: se abre con doble clic, sin instalar nada y sin internet. |
+| `configurador.html` | **La aplicación.** Un solo archivo: se abre con doble clic, sin instalar nada y sin internet. Tiene dos modos: **APC mini** y **Resolume Remote**. |
+| `remote-ejemplo.html` | Un remote ya hecho (clips de 3 capas y una página de mezcla) para probarlo tal cual. |
 | `chataigne/` | Todo listo para Chataigne con el mapa de Deseo54: los 3 scripts, `apc_config.json` y `APC_Resolume.noisette`. |
 | `chataigne/apc_config.json` | El mapa: qué hace cada control. Es lo único que cambia en el día a día. |
 | `chataigne/apc_to_resolume.js` | Script del módulo MIDI `apc`: lo que pulsas sale hacia Resolume y los demás destinos. |
@@ -227,6 +231,79 @@ En **Destinos**, pulsa **+ Destino OSC** y pon la IP y el puerto del programa. T
 
 ---
 
+## Resolume Remote
+
+En la parte de arriba del configurador, cambia a **Resolume Remote**. Ahí diseñas un mando táctil para el móvil o la tablet, con las páginas y los controles que quieras, conectado directamente a Resolume por su WebSocket: no necesita Chataigne ni el APC. Se exporta como **un único archivo `remote.html`**.
+
+### Diseñarlo
+
+| Panel | Para qué |
+|---|---|
+| **Piezas** (izquierda) | Los controles. Se arrastran al lienzo, o un clic los pone en el primer hueco: botón, fader, knob, pad XY, selector, rejilla de clips, columnas, tira de capa, tempo, valor y texto. |
+| **Parámetros** (izquierda) | **Todos los parámetros de tu composición**, leídos de Resolume: composición, tempo, crossfader, decks, columnas, cada capa, cada clip (incluidos velocidad, dirección y R/G/B), sus efectos y los parámetros de cada efecto, más las acciones (lanzar clip o columna, vaciar capa, limpiar todo…). Tienen buscador. |
+| **Asistente** (izquierda) | **Crear un remote paso a paso**: eliges qué capas quieres lanzar, qué capas mezclar, tempo, master, efectos… y lo monta solo. Debajo, una revisión en directo que te dice qué falta o qué está mal, con botón «Ir». |
+| **Lienzo** (centro) | La pantalla del aparato elegido (móvil o tablet, en vertical u horizontal, u ordenador) con su rejilla. Se mueve arrastrando y se cambia el tamaño desde la esquina. Varias páginas en pestañas. |
+| **Inspector** (derecha) | Ajustes del control elegido: a qué está conectado, etiqueta, color, opciones (interruptor o momentáneo, valor fijo, orientación del fader, capa y número de clips de la rejilla…). |
+
+**Arrastrar y soltar:**
+- Una **pieza** soltada en un hueco crea ese control.
+- Un **parámetro** soltado en un hueco crea el control que le va: un valor con rango crea un fader, un sí/no o un pulsador crea un botón, y unas opciones crean un selector.
+- Un **parámetro** soltado **encima de un control** lo conecta a ese control.
+- Si el control no sirve para ese parámetro, el configurador te lo dice.
+
+**Atajos:**
+- **Supr:** borrar.
+- **Ctrl+D:** duplicar.
+- **Flechas:** mover.
+- **Ctrl+Z / Ctrl+Y:** deshacer y rehacer.
+- **Esc:** quitar la selección.
+
+**Probar sin salir del configurador:**
+- **Probar:** un Resolume simulado. Lanzar clips, mover faders y tap responden igual, pero no se manda nada a ningún sitio.
+- **Con Resolume:** se conecta a tu Resolume de verdad. Pide confirmación antes.
+
+### Leer tu composición
+
+En **Parámetros**, pulsa **Leer de Resolume**. Usa la IP y el puerto de la pestaña Resolume del modo APC (por defecto `127.0.0.1:8080`).
+
+- Se lee por **WebSocket**, que funciona aunque el configurador esté abierto como archivo local. Eso arregla también el «Leer composición» del modo APC, que ahora usa el mismo camino.
+- Sin composición leída, se usa una **de ejemplo** hecha con los nombres de tu mapa. Sirve para diseñar, pero no tiene tus efectos reales.
+
+### Ponerlo en la tablet
+
+El webserver de Resolume puede servir tus propios archivos, gracias a su **Root Directory**:
+
+1. En el configurador, pulsa **Exportar remote** y luego **Guardar en la carpeta…**. Elige, por ejemplo, `Documentos\Resolume Remote`.
+2. En Resolume, ve a **Preferencias → Webserver**. Activa el webserver y pon esa misma carpeta como **Root Directory**.
+3. En la tablet, conectada a la misma wifi, abre `http://IP-del-PC:8080/remote.html`. La IP del PC sale en esa misma pantalla de Resolume.
+4. En el navegador de la tablet, usa **«Añadir a pantalla de inicio»** para abrirlo a pantalla completa.
+
+El remote:
+- **se conecta solo** al Resolume que lo sirve;
+- **se reconecta** si se corta la red, y avisa mientras tanto;
+- mantiene **la pantalla encendida**;
+- permite cambiar la dirección de Resolume tocando el punto de estado (o abriéndolo con `?host=IP:puerto`).
+
+También funciona con doble clic en el propio PC: en ese caso se conecta a `127.0.0.1:8080`.
+
+### Cómo habla con Resolume
+
+Usa la API oficial de WebSocket (`ws://IP:8080/api/v1`), como el ejemplo oficial de Resolume:
+
+| Control | Mensaje |
+|---|---|
+| Fader, knob, XY | `{"action":"set","parameter":"/parameter/by-id/ID","value":0.5}`, como mucho uno por fotograma. Doble toque: `reset`. |
+| Interruptor (bypass, solo…) | `set` con `true` o `false` |
+| Pulsador (tap, resync…) | `set` con `true` al tocar y `false` al soltar |
+| Selector (modo de fusión, dirección…) | `set` con el número de la opción |
+| Lanzar clip o columna, vaciar capa, limpiar todo | `{"action":"trigger","parameter":"/composition/clips/by-id/ID/connect","value":true}` y luego `false` |
+| Estado (clip sonando, valores) | `subscribe` a cada parámetro; Resolume avisa con `parameter_update` |
+| Miniaturas | `GET /api/v1/composition/clips/by-id/ID/thumbnail/…` |
+
+**Por qué el remote guarda rutas y no ids.** Los **ids cambian cada vez que se abre Resolume**, así que el remote no los guarda. Guarda una **ruta**, como `/composition/layers/2/video/opacity`, y al conectarse busca el id de cada una en la composición que manda Resolume. Los **efectos se guardan por nombre** (`.../effects/blur/params/Amount`), así que aunque los reordenes el remote sigue funcionando. Las capas y los clips van por número: si los mueves, vuelve a leer la composición y el asistente te dirá qué controles han quedado sin conectar.
+
+---
+
 ## Cómo funciona por dentro
 
 ### Módulos de Chataigne
@@ -321,12 +398,20 @@ Si el clip pasa a ir al doble de velocidad, el método PUT funciona.
   - `send` del módulo WebSocket.
 - Las construcciones de JavaScript que usan los scripts existen en el motor de JUCE, por ejemplo `objeto["clave"]`, `undefined` y `Math.round`.
 - El configurador funciona en Chromium sin errores: edición, plantillas, deshacer, destinos, composición de Resolume y exportar a ZIP.
+- **Resolume Remote**, probado contra un Resolume simulado que habla el mismo protocolo WebSocket, en un navegador real:
+  - el remote exportado conecta, lanza clips (trigger por id con `true` y `false`), mueve faders y hace tap;
+  - recibe los cambios de Resolume y avisa cuando no hay conexión;
+  - en el constructor funcionan arrastrar piezas y parámetros, el asistente, el modo Probar y Exportar.
 
 **Por probar en tu equipo, fuera de un show:**
 1. Que los tres scripts cargan `apc_config.json`. Lo verás en el Logger.
 2. La velocidad de clip por **PUT** (fader 7).
 3. El `.noisette` generado: el módulo `resolumews` y los módulos de destinos se han escrito con el mismo formato que los de tu archivo, pero no se han abierto en Chataigne. Si da problemas, usa la **opción A** y crea esos módulos a mano.
 4. Sunlite por loopMIDI.
+5. **Resolume Remote con tu Resolume 7.26.** El protocolo está sacado de la documentación oficial y del ejemplo oficial de Resolume, pero no se ha probado contra un Resolume real. Lo primero que hay que comprobar:
+   - que **Leer de Resolume** trae tu composición;
+   - que en el modo **Con Resolume** se lanzan clips y se mueven los faders;
+   - que el remote se abre desde la **Root Directory** en la tablet.
 
 ---
 
@@ -343,6 +428,9 @@ Si el clip pasa a ir al doble de velocidad, el método PUT funciona.
 | R/G/B al 10 % siempre | No hay clip seleccionado en Resolume, o está vacío. Es normal. |
 | «Leer composición» falla | El navegador bloquea leer Resolume desde un archivo local. Usa **Cargar desde archivo…** (ver la pestaña Resolume). |
 | «Guardar en la carpeta» no aparece o falla | Usa Chrome o Edge, o **Descargar ZIP**. |
+| El remote dice «Sin conexión» | El webserver de Resolume está apagado, la IP no es la correcta (toca el punto de estado para cambiarla) o la tablet no está en la misma red. |
+| La tablet no abre `http://IP:8080/remote.html` | Comprueba que el archivo está en la **Root Directory** de Resolume y que el firewall de Windows deja entrar al puerto 8080. |
+| Un control del remote sale con borde rojo discontinuo | Su parámetro ya no existe en la composición (has borrado o movido una capa o un efecto). Ábrelo en el constructor: el Asistente te dice cuál es. |
 | Los parpadeos no van a tempo | Activa «Parpadeos y pulsos al BPM de Resolume» en Opciones. En el módulo `apc`, `values → tempo → sendClock` tiene que estar activado: lo activa el script. |
 
 ---
@@ -443,13 +531,22 @@ src/
   scripts/*.js            los 3 scripts de Chataigne (plantillas con la marca del mapa incluido)
   default_config.json     el mapa de Deseo54 (lo genera make_default_config.js)
   noisette_template.json  tu .noisette original, sin los valores OSC auto-añadidos
-build.js                  junta todo en configurador.html y chataigne/
+  remote/catalog.js       recorre la composición de Resolume: todos los parámetros, nombres en español, ruta -> id
+  remote/runtime.js       el remote: conexión WebSocket y controles (lo usan el remote y el constructor)
+  remote/layout.js        formato del remote, revisión y asistente que lo genera
+  remote/sim.js           Resolume simulado (botón «Probar» y pruebas)
+  remote/remote.html      plantilla del remote exportado (+ remote_app.js)
+  app/remote_builder.js   el constructor de remotes
+build.js                  junta todo en configurador.html, chataigne/ y remote-ejemplo.html
 tests/                    pruebas (Node, sin dependencias)
+tests/mock_resolume.js    Resolume de mentira (WebSocket + webserver) para probar remotes sin Resolume
 ```
 
 ```bash
-npm run build   # regenera configurador.html y chataigne/
-npm test        # build + todas las pruebas
+npm run build              # regenera configurador.html, chataigne/ y remote-ejemplo.html
+npm test                   # build + todas las pruebas
+npm run resolume-de-prueba # Resolume simulado en http://127.0.0.1:8080 (abre /remote-ejemplo.html)
+npm run test:navegador     # pruebas en Chromium (necesita: npm i -D playwright)
 ```
 
 Las pruebas no necesitan Chataigne ni Resolume: simulan el entorno de scripts de Chataigne.
@@ -465,6 +562,11 @@ Las pruebas no necesitan Chataigne ni Resolume: simulan el entorno de scripts de
   - recarga del mapa y JSON roto;
   - mapa incluido en el script y velocidad por PUT y por WebSocket.
 - **`generator.test.js`** prueba la normalización, la composición de Resolume, el aviso de clips movidos y el ZIP.
+- **`remote.test.js`** prueba el remote:
+  - el catálogo de parámetros (efectos por nombre, nombres repetidos, parámetros con espacios);
+  - el paso de rutas a ids y las acciones por id;
+  - el simulador, la revisión del asistente y el generador de remotes.
+- **`e2e/remote.e2e.js`** prueba en Chromium el remote exportado y el constructor contra el Resolume de mentira.
 - **`check_chataigne_syntax.js`** comprueba que los scripts no usan nada que el motor JavaScript de Chataigne (JUCE) no entienda: `let`, `const`, funciones flecha, expresiones regulares, `switch`, métodos modernos de array…
 
 **Limitaciones del motor de scripts de Chataigne (respetadas en `src/scripts/`):**

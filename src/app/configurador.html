@@ -170,14 +170,58 @@ dialog::backdrop { background: #000a; }
 }
 .toast.err { border-color: var(--err); }
 .help li { margin-bottom: 6px; }
+[hidden] { display: none !important; }
+
+/* ---------- constructor de remotes ---------- */
+#remoteMode { flex: 1; display: flex; min-height: 0; }
+#rbLeft { width: 300px; flex-shrink: 0; background: var(--panel); border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+#rbRight { width: 320px; flex-shrink: 0; background: var(--panel); border-left: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+#rbRight .tabpane { display: block; }
+#rbCenter { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.rbbar { display: flex; gap: 8px; align-items: center; padding: 8px 12px; flex-wrap: wrap; }
+.rbbar .spacer { flex: 1; }
+.rbbar input#rbName { width: 220px; }
+.rbbar select { width: auto; }
+#rbPages button.on { background: var(--accent); color: #111; border-color: var(--accent); }
+#rbHint { font-size: 12px; border-top: 1px solid var(--line); min-height: 34px; }
+#rbStage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 12px; background: #0b0c0d; }
+#rbFrame { position: relative; background: #111214; border: 10px solid #2a2c30; border-radius: 18px; box-shadow: 0 10px 40px #000a; }
+#rbGrid { position: absolute; inset: 6px; width: auto; height: auto; }
+#rbGrid.editing { background-image: linear-gradient(#ffffff0d 1px, transparent 1px), linear-gradient(90deg, #ffffff0d 1px, transparent 1px);
+	background-size: calc(100% / var(--cols)) calc(100% / var(--rows)); }
+#rbDrop { position: absolute; display: none; pointer-events: none; border: 2px dashed var(--accent); background: #ffb00022; border-radius: 8px; margin: 6px; box-sizing: border-box; }
+#rbDrop.bad { border-color: var(--err); background: #ff5a5222; }
+.rb-ov { position: absolute; inset: 0; z-index: 5; cursor: move; border-radius: inherit; }
+.rb-ov:hover { outline: 1px solid #ffffff55; }
+.rb-ov.sel { outline: 2px solid var(--accent); }
+.rb-ov.target { outline: 3px solid #4cd06a; background: #4cd06a22; }
+.rb-tag { position: absolute; top: 2px; right: 4px; font-size: 9px; color: #fff9; text-shadow: 0 0 2px #000; pointer-events: none; opacity: 0; }
+.rb-ov:hover .rb-tag, .rb-ov.sel .rb-tag { opacity: 1; }
+.rb-rs { position: absolute; right: 0; bottom: 0; width: 16px; height: 16px; cursor: nwse-resize; background: linear-gradient(135deg, transparent 50%, var(--accent) 50%); border-bottom-right-radius: 6px; opacity: 0; }
+.rb-ov.sel .rb-rs, .rb-ov:hover .rb-rs { opacity: 1; }
+.rb-empty { grid-column: 1 / -1; grid-row: 1 / -1; display: flex; align-items: center; justify-content: center; text-align: center; color: var(--dim); pointer-events: none; padding: 20px; line-height: 1.6; }
+.rb-piece { display: flex; gap: 10px; align-items: center; padding: 8px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 6px; cursor: grab; background: var(--panel2); }
+.rb-piece:hover { border-color: var(--accent); }
+.rb-piece .ico { width: 34px; height: 34px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: #0f1012; border-radius: 6px; font-size: 15px; color: var(--accent); font-weight: 700; }
+.rb-piece .hint { margin: 0; }
+#rbTree details { margin-bottom: 4px; }
+#rbTree summary { cursor: pointer; padding: 4px 2px; font-size: 12px; font-weight: 600; }
+.rb-param { display: flex; justify-content: space-between; gap: 8px; padding: 4px 8px; margin: 2px 0 2px 10px; border-radius: 5px; background: var(--panel2); cursor: grab; font-size: 12px; }
+.rb-param:hover { background: #2f3339; }
+.rb-param .vt { color: var(--dim); font-size: 10px; white-space: nowrap; }
+.rb-checks { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 10px; margin: 6px 0; }
+#rbDialog { width: min(620px, 94vw); max-height: 90vh; }
+.rb-issue { font-size: 12px; }
+@media (max-width: 1100px) { #rbLeft { width: 240px; } #rbRight { width: 260px; } }
 </style>
 </head>
 <body>
 <header>
 	<div class="title">APC mini mk2 <span>⇄</span> Resolume</div>
-	<input class="mapname" id="mapName" type="text" title="Nombre del mapa (club o evento)">
-	<button id="btnOpen" title="Abrir un mapa guardado (.json)">Abrir mapa…</button>
-	<button id="btnSave" title="Descargar el mapa como .json">Guardar mapa</button>
+	<div class="seg" id="modeSeg"><button data-mode="apc">APC mini</button><button data-mode="remote">Resolume Remote</button></div>
+	<input class="mapname apc-only" id="mapName" type="text" title="Nombre del mapa (club o evento)">
+	<button id="btnOpen" class="apc-only" title="Abrir un mapa guardado (.json)">Abrir mapa…</button>
+	<button id="btnSave" class="apc-only" title="Descargar el mapa como .json">Guardar mapa</button>
 	<button id="btnUndo" title="Deshacer (Ctrl+Z)">↶</button>
 	<button id="btnRedo" title="Rehacer (Ctrl+Y)">↷</button>
 	<span class="spacer"></span>
@@ -185,7 +229,7 @@ dialog::backdrop { background: #000a; }
 	<input type="file" id="fileOpen" accept=".json,application/json" hidden>
 	<input type="file" id="fileComp" accept=".json,application/json" hidden>
 </header>
-<main>
+<main id="apcMain">
 	<section id="left">
 		<div class="previewbar">
 			<span class="dim">Vista previa:</span>
@@ -218,10 +262,17 @@ dialog::backdrop { background: #000a; }
 	</aside>
 </main>
 
+<main id="remoteMode" hidden></main>
+
 <dialog id="tplDialog"></dialog>
 
 <script>/*@@GENERATOR@@*/</script>
 <script>window.APP_DATA = /*@@DATA@@*/null;</script>
+<script>/*@@CATALOG@@*/</script>
+<script>/*@@SIM@@*/</script>
+<script>/*@@LAYOUTJS@@*/</script>
+<script>/*@@RUNTIME@@*/</script>
+<script>/*@@BUILDER@@*/</script>
 <script>/*@@APP@@*/</script>
 </body>
 </html>

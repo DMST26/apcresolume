@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#111214">
+<title>Resolume Remote</title>
+<style>
+:root { color-scheme: dark; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; background: #111214; color: #e8e9eb; font: 13px/1.3 "Segoe UI", system-ui, -apple-system, sans-serif; overflow: hidden; overscroll-behavior: none; }
+body { display: flex; flex-direction: column; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+#bar { display: flex; align-items: center; gap: 6px; padding: 6px 8px; background: #1a1c1f; border-bottom: 1px solid #2c3036; flex-shrink: 0; }
+#bar .title { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 30vw; }
+#tabs { display: flex; gap: 4px; flex: 1; overflow-x: auto; scrollbar-width: none; }
+#tabs button, #bar > button { background: #24272c; border: 1px solid #30343a; color: inherit; border-radius: 6px; padding: 7px 12px; font: inherit; white-space: nowrap; cursor: pointer; }
+#tabs button.on { background: var(--acc, #ffb000); border-color: var(--acc, #ffb000); color: #111; font-weight: 600; }
+#status { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #9aa0a8; white-space: nowrap; cursor: pointer; }
+#status i { width: 10px; height: 10px; border-radius: 50%; background: #ff5a52; display: inline-block; }
+#status.ok i { background: #4cd06a; }
+#page { flex: 1; min-height: 0; padding: 6px; }
+#overlay { position: fixed; inset: auto 0 0 0; padding: 8px 12px; background: #ff5a52e6; color: #111; font-weight: 600; text-align: center; display: none; }
+#overlay.show { display: block; }
+/*@@CSS@@*/
+</style>
+</head>
+<body>
+<div id="bar">
+	<span class="title" id="title"></span>
+	<div id="tabs"></div>
+	<span id="status" title="Cambiar la dirección de Resolume"><i></i><span id="statusText">Conectando…</span></span>
+	<button id="full" title="Pantalla completa">⛶</button>
+</div>
+<div id="page"></div>
+<div id="overlay"></div>
+<script>window.REMOTE_LAYOUT = /*@@LAYOUT@@*/null;</script>
+<script>/*@@CATALOG@@*/</script>
+<script>/*@@RUNTIME@@*/</script>
+<script>/*@@APP@@*/</script>
+</body>
+</html>

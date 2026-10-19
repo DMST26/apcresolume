@@ -721,7 +721,7 @@
 			'<div class="row">' + field("IP del ordenador de Resolume", '<input type="text" id="resHost" value="' + esc(cfg.resolume.host) + '">') +
 			'<div class="field fixed"><label>Puerto web</label><input type="number" id="resPort" value="' + cfg.resolume.apiPort + '"></div></div>' +
 			'<div class="row"><button class="primary" id="btnReadComp">Leer composición</button><button id="btnLoadComp">Cargar desde archivo…</button></div>' +
-			'<p class="hint">Si «Leer» falla (el navegador bloquea leer Resolume desde un archivo), abre <code>http://' + esc(cfg.resolume.host) + ":" + cfg.resolume.apiPort +
+			'<p class="hint">Si «Leer» falla, abre <code>http://' + esc(cfg.resolume.host) + ":" + cfg.resolume.apiPort +
 			"/api/v1/composition</code> en otra pestaña, guárdalo con Ctrl+S como <code>composicion.json</code> y cárgalo con el segundo botón.</p>";
 		if (comp) {
 			h += '<div class="box"><strong>' + esc(comp.name || "Composición") + "</strong> · " + comp.layers.length + ' capas <button class="small" id="btnForgetComp" style="float:right">Olvidar</button></div>';
@@ -780,20 +780,28 @@
 		if (how == "accept") { if (second) d.name2 = clipName(d.layer2, d.clip2); else d.name = clipName(d.layer, d.clip); }
 	}
 
+	// Primero por WebSocket (funciona aunque el configurador se abra como archivo local) y si no, por HTTP.
 	async function readComposition() {
-		const url = "http://" + cfg.resolume.host + ":" + cfg.resolume.apiPort + "/api/v1/composition";
+		const host = cfg.resolume.host + ":" + cfg.resolume.apiPort;
+		const url = "http://" + host + "/api/v1/composition";
+		try {
+			setComposition(await window.RemoteRuntime.fetchComposition(host, 5000));
+			return;
+		} catch (e) { /* se prueba por HTTP */ }
 		try {
 			const r = await fetch(url, { cache: "no-store" });
 			if (!r.ok) throw new Error("Resolume respondió " + r.status);
 			setComposition(await r.json());
 		} catch (e) {
-			toast("No se pudo leer " + url + ". Comprueba que el Webserver de Resolume está activado, o guarda la composición en un archivo y cárgala (ver la explicación).", true);
+			toast("No se pudo leer la composición de " + host + ". Comprueba que Resolume está abierto con el Webserver activado, o guárdala en un archivo y cárgala (ver la explicación).", true);
 		}
 	}
 	function setComposition(json) {
 		try {
 			comp = G.parseComposition(json);
 			store.set("composition", comp);
+			// el constructor de remotes usa la composición completa
+			window.dispatchEvent(new CustomEvent("apc:composition", { detail: json }));
 			toast("Composición leída: " + comp.layers.length + " capas.");
 			renderAll();
 		} catch (e) { toast(e.message, true); }
@@ -1003,8 +1011,10 @@
 
 	function renderAll() {
 		$("mapName").value = cfg.name;
-		$("btnUndo").disabled = !history.length;
-		$("btnRedo").disabled = !future.length;
+		if (document.body.dataset.mode != "remote") {
+			$("btnUndo").disabled = !history.length;
+			$("btnRedo").disabled = !future.length;
+		}
 		document.querySelectorAll("#previewSeg button").forEach((b) => b.classList.toggle("on", b.dataset.mode == previewMode));
 		sel.idx = sel.idx.filter((i) => sel.kind == "shift" ? i == 0 : i < (sel.kind == "pad" ? 64 : sel.kind == "fader" ? 9 : 8));
 		renderDevice();
@@ -1078,6 +1088,7 @@
 		$("btnRedo").onclick = redo;
 		$("btnExport").onclick = () => showTab("exp");
 		document.addEventListener("keydown", (e) => {
+			if (document.body.dataset.mode == "remote") return;
 			const typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement && document.activeElement.tagName);
 			if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() == "z" && !typing) { e.preventDefault(); if (e.shiftKey) redo(); else undo(); }
 			else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() == "y" && !typing) { e.preventDefault(); redo(); }
@@ -1090,6 +1101,44 @@
 		renderHelp();
 		renderAll();
 		updateShowTimer();
+		setupModes();
+	}
+
+	// ---------- modo APC / Resolume Remote ----------
+
+	let appMode = "apc";
+	function setupModes() {
+		window.APCApp = {
+			getConfig: () => cfg,
+			getComposition: () => comp,
+			setComposition: setComposition,
+			openCompositionFile: () => $("fileComp").click(),
+			toast: toast,
+			download: download,
+			setRemoteToolbar: (st) => {
+				if (appMode != "remote") return;
+				$("btnUndo").disabled = !st.undo;
+				$("btnRedo").disabled = !st.redo;
+			}
+		};
+		window.RemoteBuilder.init();
+		$("modeSeg").onclick = (e) => { const b = e.target.closest("[data-mode]"); if (b) setAppMode(b.dataset.mode); };
+		$("btnUndo").onclick = () => (appMode == "remote" ? window.RemoteBuilder.undo() : undo());
+		$("btnRedo").onclick = () => (appMode == "remote" ? window.RemoteBuilder.redo() : redo());
+		$("btnExport").onclick = () => (appMode == "remote" ? window.RemoteBuilder.exportDialog() : showTab("exp"));
+		setAppMode(store.get("appMode", "apc"));
+	}
+	function setAppMode(m) {
+		appMode = m == "remote" ? "remote" : "apc";
+		store.set("appMode", appMode);
+		document.body.dataset.mode = appMode;
+		document.querySelectorAll("#modeSeg button").forEach((b) => b.classList.toggle("on", b.dataset.mode == appMode));
+		$("apcMain").hidden = appMode != "apc";
+		$("remoteMode").hidden = appMode != "remote";
+		document.querySelectorAll(".apc-only").forEach((x) => { x.hidden = appMode != "apc"; });
+		$("btnExport").textContent = appMode == "remote" ? "Exportar remote" : "Exportar para Chataigne";
+		if (appMode == "remote") window.RemoteBuilder.show();
+		else { window.RemoteBuilder.hide(); renderAll(); }
 	}
 
 	init();
