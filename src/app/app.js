@@ -98,8 +98,11 @@
 	let clipboard = null;
 	let dirHandle = null;
 	let showState = {};
+	let devIdx = Math.min(store.get("device", 0), (cfg.devices || []).length); // 0 = APC 1, 1 = cfg.devices[0]...
 
 	const $ = (id) => document.getElementById(id);
+	// Mapa del APC que se está editando (el principal está en la raíz del mapa)
+	function D() { return devIdx > 0 && cfg.devices[devIdx - 1] ? cfg.devices[devIdx - 1] : cfg; }
 	const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 	const clone = (o) => JSON.parse(JSON.stringify(o));
 
@@ -147,11 +150,11 @@
 		return i && !i.missing ? i.name : "";
 	}
 	function ctlAt(kind, i) {
-		if (kind == "pad") return cfg.pads[i];
-		if (kind == "bottom") return cfg.bottom[i];
-		if (kind == "side") return cfg.side[i];
-		if (kind == "shift") return cfg.shift;
-		return cfg.faders[i];
+		if (kind == "pad") return D().pads[i];
+		if (kind == "bottom") return D().bottom[i];
+		if (kind == "side") return D().side[i];
+		if (kind == "shift") return D().shift;
+		return D().faders[i];
 	}
 	function selected() { return sel.idx.map((i) => ctlAt(sel.kind, i)); }
 	function isToggle(d) { return d.type == "bypass" || d.type == "blackout" || ((d.type == "osc" || d.type == "midi") && d.mode == "toggle"); }
@@ -239,7 +242,7 @@
 		return '<div class="led blink" style="background:' + hex + ";animation-duration:" + dur.toFixed(3) + "s;animation-delay:-" + ((performance.now() / 1000) % dur).toFixed(3) + 's"></div>';
 	}
 	function previewPadState(i) {
-		const d = cfg.pads[i];
+		const d = D().pads[i];
 		const t = d.type;
 		if (t == "none") return null;
 		if (t == "clip" || t == "dual") {
@@ -254,7 +257,7 @@
 		return previewMode == "active" ? "active" : "loaded";
 	}
 	function padLed(i) {
-		const d = cfg.pads[i];
+		const d = D().pads[i];
 		const st = previewPadState(i);
 		if (!st) return "";
 		return ledHtml(d.led[st], PALETTE[d.color]);
@@ -267,7 +270,7 @@
 		if (previewMode != "show") return;
 		const tick = () => {
 			const byLayer = {};
-			cfg.pads.forEach((d, i) => {
+			D().pads.forEach((d, i) => {
 				if (d.type != "clip" && d.type != "dual") return;
 				(byLayer[d.layer] = byLayer[d.layer] || []).push(i);
 			});
@@ -288,7 +291,7 @@
 	function issuesByPad() {
 		const m = {};
 		G.validateConfig(cfg, comp).forEach((w) => {
-			if (!w.ref || w.ref.pad === undefined) return;
+			if (!w.ref || w.ref.pad === undefined || (w.ref.device || 0) != devIdx) return;
 			if (w.level == "error" || !m[w.ref.pad]) m[w.ref.pad] = w.level;
 		});
 		return m;
@@ -297,7 +300,8 @@
 	function renderDevice() {
 		const issues = issuesByPad();
 		const isSel = (kind, i) => sel.kind == kind && sel.idx.indexOf(i) >= 0;
-		let h = '<div class="brand" style="grid-row:1"><span>AKAI · APC MINI MK2</span><span>' + esc(cfg.name) + "</span></div>";
+		const devName = devIdx ? (D().label || "APC " + (devIdx + 1)) + " (" + D().id + ")" : "APC 1 (apc)";
+		let h = '<div class="brand" style="grid-row:1"><span>AKAI · APC MINI MK2</span><span>' + esc(devName) + "</span></div>";
 
 		h += '<div class="rowlabels" style="grid-row:2;grid-column:1">';
 		for (let r = 8; r >= 1; r--) h += '<div><span>F' + r + '</span><button class="small" data-tpl="' + (r - 1) + '" title="Plantilla para la fila ' + r + '">▦</button></div>';
@@ -306,7 +310,7 @@
 		h += '<div class="grid" style="grid-row:2;grid-column:2">';
 		for (let row = 7; row >= 0; row--) {
 			for (let col = 0; col < 8; col++) {
-				const i = row * 8 + col, d = cfg.pads[i];
+				const i = row * 8 + col, d = D().pads[i];
 				let ico = d.type == "clip" ? d.layer + "·" + d.clip : d.type == "dual" ? d.layer + "+" + d.layer2 : (ICONS[d.type] || "");
 				if (d.extra && d.extra.length) ico += " +";
 				const badge = issues[i] ? '<span class="badge ' + (issues[i] == "error" ? "err" : "warn") + '">' + (issues[i] == "error" ? "✖" : "⚠") + "</span>" : "";
@@ -319,7 +323,7 @@
 		const btnPreview = (d) => previewMode == "active" ? d.led.active : d.led.idle;
 		h += '<div class="side" style="grid-row:2;grid-column:3">';
 		for (let i = 0; i < 8; i++) {
-			const d = cfg.side[i];
+			const d = D().side[i];
 			h += '<div class="btn' + (isSel("side", i) ? " sel" : "") + '" data-kind="side" data-i="' + i + '" title="' + esc(ctlTitle("side", i) + " · nota " + (112 + i)) + '">' +
 				buttonLedHtml(btnPreview(d), SIDE_COLOR) + '<span class="blbl">' + esc(d.label || (d.type == "none" ? "—" : "")) + "</span></div>";
 		}
@@ -327,9 +331,9 @@
 
 		h += '<div class="bottomrow" style="grid-row:3;grid-column:2">';
 		for (let i = 0; i < 8; i++) {
-			const d = cfg.bottom[i];
+			const d = D().bottom[i];
 			h += '<div class="btn' + (isSel("bottom", i) ? " sel" : "") + '" data-kind="bottom" data-i="' + i + '" title="' + esc(ctlTitle("bottom", i) + " · nota " + (100 + i) + (d.label ? " · " + d.label : "")) + '">' +
-				buttonLedHtml(btnPreview(cfg.bottom[i]), BOTTOM_COLOR) + '<span class="blbl">' + esc(d.label || "") + "</span></div>";
+				buttonLedHtml(btnPreview(D().bottom[i]), BOTTOM_COLOR) + '<span class="blbl">' + esc(d.label || "") + "</span></div>";
 		}
 		h += "</div>";
 
@@ -337,7 +341,7 @@
 
 		h += '<div class="faders" style="grid-row:4">';
 		for (let i = 0; i < 9; i++) {
-			const f = cfg.faders[i];
+			const f = D().faders[i];
 			h += '<div class="fader' + (f.type == "none" ? " none" : "") + (isSel("fader", i) ? " sel" : "") + '" data-kind="fader" data-i="' + i + '" title="' + esc(ctlTitle("fader", i) + " · CC " + (48 + i)) + '">' +
 				'<div class="track"><div class="knob"></div></div><span class="fnum">' + (i + 1) + '</span><span class="flbl">' + esc(faderLabel(f)) + "</span></div>";
 		}
@@ -431,6 +435,11 @@
 			h += '<div class="row">' + field(a.msg == "cc" ? "Número de CC" : a.msg == "pc" ? "Programa" : "Nota", input(p + "number", a.number, "int", 'min="0" max="127"')) +
 				(a.msg == "pc" ? "" : field(a.msg == "cc" ? "Valor" : "Velocity", input(p + "value", a.value, "int", 'min="0" max="127"'))) + "</div>";
 			if (a.msg != "pc") h += field("Modo", select(p + "mode", a.mode, opts(modeOptions("midi"), a.mode)));
+		}
+		if (isMain && a.target && a.target != "resolume") {
+			h += '<label class="check"><input type="checkbox" data-k="feedback" data-t="bool"' + (a.feedback ? " checked" : "") + "> LED según lo que devuelva el programa</label>" +
+				'<div class="hint">El LED se enciende cuando ' + esc(a.target) + " devuelve esta misma " + (a.type == "osc" ? "dirección OSC" : a.msg == "cc" ? "CC" : "nota") +
+				" (p. ej. la escena está activa en Sunlite). Para Sunlite suele ir mejor el modo «Pulso». Necesita el script destino_a_apc.js en el módulo «" + esc(a.target) + "».</div>";
 		}
 		return h;
 	}
@@ -561,6 +570,7 @@
 		if (t == "int") return parseInt(el.value, 10) || 0;
 		if (t == "num") { const n = parseFloat(String(el.value).replace(",", ".")); return isNaN(n) ? 0 : n; }
 		if (t == "layers") return G.layerList(el.value);
+		if (t == "bool") return el.checked;
 		return el.value;
 	}
 
@@ -615,11 +625,11 @@
 		else if (act == "reset") commit(() => sel.idx.forEach((i) => replaceCtl(sel.kind, i, { type: "none" })));
 	}
 	function replaceCtl(kind, i, d) {
-		if (kind == "pad") cfg.pads[i] = d;
-		else if (kind == "bottom") cfg.bottom[i] = d;
-		else if (kind == "side") cfg.side[i] = d;
-		else if (kind == "shift") cfg.shift = d;
-		else cfg.faders[i] = d;
+		if (kind == "pad") D().pads[i] = d;
+		else if (kind == "bottom") D().bottom[i] = d;
+		else if (kind == "side") D().side[i] = d;
+		else if (kind == "shift") D().shift = d;
+		else D().faders[i] = d;
 	}
 
 	// ---------- selección ----------
@@ -640,6 +650,8 @@
 	}
 	function selectRef(ref) {
 		if (!ref) return;
+		if (ref.link !== undefined) { showTab("lnk"); return; }
+		if ((ref.device || 0) != devIdx) { devIdx = ref.device || 0; store.set("device", devIdx); renderAll(); }
 		if (ref.pad !== undefined) sel = { kind: "pad", idx: [ref.pad] };
 		else if (ref.fader !== undefined) sel = { kind: "fader", idx: [ref.fader] };
 		else if (ref.group) sel = { kind: ref.group, idx: [ref.index || 0] };
@@ -652,7 +664,7 @@
 
 	function openTemplate(row) {
 		const dlg = $("tplDialog");
-		const cur = cfg.pads[row * 8];
+		const cur = D().pads[row * 8];
 		const layerField = (id, v) => comp && comp.layers.length
 			? '<select id="' + id + '">' + opts(comp.layers.map((l, i) => [i + 1, (i + 1) + " · " + (l.name || "sin nombre")]), v) + "</select>"
 			: '<input type="number" id="' + id + '" min="1" value="' + v + '">';
@@ -696,13 +708,13 @@
 			const colorMode = $("tplColorMode").value, labels = $("tplLabels").checked;
 			commit(() => {
 				for (let c = 0; c < 8; c++) {
-					const i = row * 8 + c, old = cfg.pads[i];
-					if (kind == "none") { cfg.pads[i] = { type: "none" }; continue; }
+					const i = row * 8 + c, old = D().pads[i];
+					if (kind == "none") { D().pads[i] = { type: "none" }; continue; }
 					const d = { type: kind, layer: L, clip: first + c, name: clipName(L, first + c), led: clone(led), extra: old.extra };
 					if (kind == "dual") { d.layer2 = L2; d.clip2 = first2 + c; d.name2 = clipName(L2, first2 + c); }
 					d.color = colorMode == "rainbow" ? RAINBOW[c] : colorMode == "keep" ? (old.color || color) : color;
 					d.label = labels ? (d.name || "") : "";
-					cfg.pads[i] = d;
+					D().pads[i] = d;
 				}
 			});
 			dlg.close();
@@ -726,7 +738,7 @@
 		if (comp) {
 			h += '<div class="box"><strong>' + esc(comp.name || "Composición") + "</strong> · " + comp.layers.length + ' capas <button class="small" id="btnForgetComp" style="float:right">Olvidar</button></div>';
 			const issues = G.checkNames(cfg, comp);
-			const named = cfg.pads.filter((d) => (d.type == "clip" || d.type == "dual") && d.name).length;
+			const named = G.allDevices(cfg).reduce((n, dv) => n + dv.pads.filter((d) => (d.type == "clip" || d.type == "dual") && d.name).length, 0);
 			h += "<h3>Comprobación de nombres</h3>";
 			if (!issues.length) h += '<p class="ok">✔ Todo coincide con la composición.</p>';
 			issues.forEach((w, n) => {
@@ -761,11 +773,14 @@
 		$("btnSaveNames").onclick = () => {
 			if (!confirm("¿Guardar en el mapa el nombre que tiene ahora cada clip en Resolume?")) return;
 			commit(() => {
-				cfg.pads.forEach((d) => {
-					if (d.type == "clip" || d.type == "dual") d.name = clipName(d.layer, d.clip);
-					if (d.type == "dual") d.name2 = clipName(d.layer2, d.clip2);
+				G.allDevices(cfg).forEach((dv, di) => {
+					const real = di ? cfg.devices[di - 1] : cfg;
+					real.pads.forEach((d) => {
+						if (d.type == "clip" || d.type == "dual") d.name = clipName(d.layer, d.clip);
+						if (d.type == "dual") d.name2 = clipName(d.layer2, d.clip2);
+					});
+					real.faders.forEach((f) => { if (f.type == "clipSpeed") f.name = clipName(f.layer, f.clip); });
 				});
-				cfg.faders.forEach((f) => { if (f.type == "clipSpeed") f.name = clipName(f.layer, f.clip); });
 			});
 		};
 		$("btnFixAll").onclick = () => commit(() => issues.forEach((w) => applyFix(w, "move")));
@@ -774,7 +789,8 @@
 	}
 	function applyFix(w, how) {
 		if (w.kind != "name") return;
-		const d = w.ref.pad !== undefined ? cfg.pads[w.ref.pad] : cfg.faders[w.ref.fader];
+		const dv = w.ref.device ? cfg.devices[w.ref.device - 1] : cfg;
+		const d = w.ref.pad !== undefined ? dv.pads[w.ref.pad] : dv.faders[w.ref.fader];
 		const second = w.which == 2;
 		if (how == "move" && w.moveTo) { if (second) d.clip2 = w.moveTo; else d.clip = w.moveTo; }
 		if (how == "accept") { if (second) d.name2 = clipName(d.layer2, d.clip2); else d.name = clipName(d.layer, d.clip); }
@@ -866,11 +882,143 @@
 	}
 	function eachAction(fn) {
 		const ctl = (d) => { if (d.type == "osc" || d.type == "midi") fn(d); (d.extra || []).forEach(fn); };
-		cfg.pads.forEach(ctl); cfg.bottom.forEach(ctl); cfg.side.forEach(ctl); ctl(cfg.shift);
-		cfg.faders.forEach((f) => { if (f.type == "osc" || f.type == "midiCC") fn(f); });
+		[cfg].concat(cfg.devices || []).forEach((dv) => {
+			dv.pads.forEach(ctl); dv.bottom.forEach(ctl); dv.side.forEach(ctl); ctl(dv.shift);
+			dv.faders.forEach((f) => { if (f.type == "osc" || f.type == "midiCC") fn(f); });
+		});
+		(cfg.links || []).forEach((l) => l.actions.forEach(fn));
 	}
 	function countUses(id) { let n = 0; eachAction((a) => { if (a.target == id) n++; }); return n; }
 	function renameTargetUses(old, nu) { eachAction((a) => { if (a.target == old) a.target = nu; }); }
+
+	// ---------- varios APC ----------
+
+	function renderDevBar() {
+		const list = [{ label: "APC 1", id: "apc" }].concat(cfg.devices.map((d, i) => ({ label: d.label || "APC " + (i + 2), id: d.id })));
+		let h = '<span class="dim">APC:</span><div class="seg">' + list.map((d, i) => '<button data-dev="' + i + '" class="' + (i == devIdx ? "on" : "") + '">' + esc(d.label) + "<small>" + esc(d.id) + "</small></button>").join("") + "</div>";
+		if (list.length < G.MAX_DEVICES) h += '<button class="small" id="devAdd" title="Otro APC mini mk2 (por ejemplo para Sunlite)">+ Añadir APC</button>';
+		if (devIdx > 0) {
+			h += '<input type="text" id="devLabel" style="width:160px" value="' + esc(D().label) + '" placeholder="Nombre (p. ej. APC Sunlite)">' +
+				'<button class="small" id="devDel">Quitar este APC</button>';
+		}
+		h += '<span class="dim" style="font-size:12px">' + (devIdx ? "En Chataigne: módulo MIDI «" + esc(D().id) + "» con el script apc_to_resolume.js." : list.length > 1 ? "Cada APC es un módulo MIDI de Chataigne con el mismo script." : "") + "</span>";
+		$("devBar").innerHTML = h;
+		$("devBar").querySelectorAll("[data-dev]").forEach((b) => { b.onclick = () => { devIdx = +b.dataset.dev; store.set("device", devIdx); sel = { kind: "pad", idx: [] }; renderAll(); }; });
+		if ($("devAdd")) $("devAdd").onclick = () => {
+			const copy = confirm("¿Empezar el APC nuevo con una copia del mapa de este?\nAceptar = copia · Cancelar = vacío");
+			commit(() => {
+				const src = D();
+				const nd = copy ? clone({ pads: src.pads, bottom: src.bottom, side: src.side, shift: src.shift, faders: src.faders }) : {};
+				nd.id = ""; // el generador le da apc2, apc3...
+				nd.label = "";
+				cfg.devices.push(nd);
+			});
+			devIdx = cfg.devices.length;
+			store.set("device", devIdx);
+			renderAll();
+			toast("APC añadido: en Chataigne crea un módulo MIDI llamado «" + D().id + "» (o usa el .noisette exportado) con el script apc_to_resolume.js.");
+		};
+		if ($("devLabel")) $("devLabel").onchange = (e) => commit(() => { D().label = e.target.value.trim(); });
+		if ($("devDel")) $("devDel").onclick = () => {
+			if (!confirm("¿Quitar «" + (D().label || D().id) + "» y su mapa? (Ctrl+Z para deshacer)")) return;
+			commit(() => { cfg.devices.splice(devIdx - 1, 1); });
+			devIdx = 0;
+			store.set("device", 0);
+			renderAll();
+		};
+	}
+
+	// ---------- enlaces ----------
+
+	function renderLinks() {
+		const el = $("tab-lnk");
+		const links = cfg.links || [];
+		const midi = cfg.targets.filter((t) => t.type == "midi");
+		let h = "<h2>Enlaces automáticos</h2>" +
+			'<p class="dim">Mientras suene algún clip de una capa, se manda algo a otro programa; cuando deja de sonar, se apaga. Siguen el estado real de Resolume, aunque el clip se lance desde Resolume o desde la tablet.</p>' +
+			'<p class="dim">Ejemplo: mientras suena un <strong>cegado</strong>, <strong>blackout</strong> de la iluminación en Sunlite.</p>' +
+			'<div class="row" style="margin-bottom:12px"><button class="primary" id="lnkPreset">+ Cegados → blackout de Sunlite</button><button id="lnkAdd">+ Enlace vacío</button></div>';
+		links.forEach((l, i) => {
+			h += '<div class="box"><div class="lnk-head"><label class="check fixed"><input type="checkbox" data-l="' + i + '" data-f="enabled"' + (l.enabled ? " checked" : "") + '></label>' +
+				'<input type="text" data-l="' + i + '" data-f="label" value="' + esc(l.label) + '" placeholder="Nombre del enlace"><button class="small fixed" data-ldel="' + i + '">Quitar</button></div>' +
+				'<div class="row"><div class="field"><label>Mientras suene… capa</label>' + linkLayerInput(i, l.layer) + "</div>" +
+				'<div class="field fixed"><label>clips del</label><input type="number" min="1" data-l="' + i + '" data-f="from" value="' + l.from + '"></div>' +
+				'<div class="field fixed"><label>al</label><input type="number" min="1" data-l="' + i + '" data-f="to" value="' + l.to + '"></div></div>' +
+				'<div class="hint">' + esc(linkClipsText(l)) + "</div>";
+			l.actions.forEach((a, k) => {
+				h += '<div class="box" style="background:#0f1012;margin-top:8px"><div class="row" style="margin-bottom:6px"><strong>' + (a.type == "midi" ? "MIDI" : "OSC") +
+					'</strong><span class="fixed"><button class="small" data-adel="' + i + ":" + k + '">Quitar</button></span></div>' + linkActionFields(i, k, a) + "</div>";
+			});
+			if (l.actions.length < G.MAX_EXTRA) h += '<div class="row" style="margin-top:8px"><button class="small" data-aadd="' + i + ':midi">+ MIDI</button><button class="small" data-aadd="' + i + ':osc">+ OSC</button></div>';
+			h += "</div>";
+		});
+		if (!links.length) h += '<p class="dim">Todavía no hay enlaces.</p>';
+		if (!midi.length) h += '<p class="hint">Para mandar a Sunlite necesitas un destino MIDI (pestaña Destinos); la plantilla lo crea si no existe.</p>';
+		el.innerHTML = h;
+
+		$("lnkPreset").onclick = () => commit(() => {
+			if (!cfg.targets.some((t) => t.id == "sunlite")) cfg.targets.push({ id: "sunlite", type: "midi", label: "Sunlite Suite", device: "loopMIDI Port" });
+			const blind = guessBlindRange();
+			cfg.links.push({ label: "Cegado = blackout de luces", layer: blind.layer, from: blind.from, to: blind.to,
+				actions: [{ type: "midi", target: "sunlite", msg: "note", channel: 1, number: 50, value: 127 }] });
+			toast("Enlace creado. En Sunlite asigna la nota 50 (canal 1) al blackout con el aprendizaje MIDI, o cambia la nota aquí.");
+		});
+		$("lnkAdd").onclick = () => commit(() => { cfg.links.push({ layer: 1, from: 1, to: 8, actions: [] }); });
+		el.querySelectorAll("[data-l]").forEach((inp) => {
+			inp.onchange = () => commit(() => {
+				const l = cfg.links[+inp.dataset.l], f = inp.dataset.f;
+				l[f] = f == "enabled" ? inp.checked : f == "label" ? inp.value : parseInt(inp.value, 10) || 1;
+			});
+		});
+		el.querySelectorAll("[data-la]").forEach((inp) => {
+			inp.onchange = () => commit(() => {
+				const parts = inp.dataset.la.split(":"), a = cfg.links[+parts[0]].actions[+parts[1]], f = parts[2];
+				a[f] = inp.dataset.t == "int" ? parseInt(inp.value, 10) || 0 : inp.dataset.t == "num" ? parseFloat(inp.value) : inp.value;
+			});
+		});
+		el.querySelectorAll("[data-ldel]").forEach((b) => { b.onclick = () => commit(() => { cfg.links.splice(+b.dataset.ldel, 1); }); });
+		el.querySelectorAll("[data-adel]").forEach((b) => { b.onclick = () => { const x = b.dataset.adel.split(":"); commit(() => { cfg.links[+x[0]].actions.splice(+x[1], 1); }); }; });
+		el.querySelectorAll("[data-aadd]").forEach((b) => {
+			b.onclick = () => {
+				const x = b.dataset.aadd.split(":"), m = cfg.targets.filter((t) => t.type == "midi")[0];
+				commit(() => {
+					cfg.links[+x[0]].actions.push(x[1] == "midi"
+						? { type: "midi", target: m ? m.id : "", msg: "note", channel: 1, number: 50, value: 127 }
+						: { type: "osc", target: "resolume", address: "/composition/bypassed", value: 1 });
+				});
+			};
+		});
+	}
+	function linkLayerInput(i, v) {
+		if (comp && comp.layers.length) return '<select data-l="' + i + '" data-f="layer">' + opts(comp.layers.map((l, k) => [k + 1, (k + 1) + " · " + (l.name || "sin nombre")]), v) + "</select>";
+		return '<input type="number" min="1" data-l="' + i + '" data-f="layer" value="' + v + '">';
+	}
+	function linkClipsText(l) {
+		const names = [];
+		for (let c = l.from; c <= l.to && names.length < 4; c++) { const n = clipName(l.layer, c); if (n) names.push(n); }
+		return layerLabel(l.layer) + ", clips " + l.from + "–" + l.to + (names.length ? " (" + names.join(", ") + (l.to - l.from + 1 > names.length ? "…" : "") + ")" : "");
+	}
+	function linkActionFields(i, k, a) {
+		const key = (f) => 'data-la="' + i + ":" + k + ":" + f + '"';
+		const tsel = (kind) => "<select " + key("target") + ">" + targetOptions(kind, a.target) + "</select>";
+		if (a.type == "osc") {
+			return field("Destino", tsel("osc")) + field("Dirección OSC", "<input type=\"text\" " + key("address") + ' value="' + esc(a.address) + '" list="oscList">') +
+				field("Valor mientras suena", "<input type=\"number\" step=\"any\" " + key("value") + ' data-t="num" value="' + a.value + '">', "Al dejar de sonar se manda 0.");
+		}
+		return field("Destino", tsel("midi")) +
+			'<div class="row">' + field("Mensaje", "<select " + key("msg") + ">" + opts([["note", "Nota (on / off)"], ["cc", "CC (valor / 0)"], ["pc", "Program change"]], a.msg) + "</select>") +
+			field("Canal", "<input type=\"number\" min=\"1\" max=\"16\" " + key("channel") + ' data-t="int" value="' + a.channel + '">') + "</div>" +
+			'<div class="row">' + field(a.msg == "cc" ? "CC" : a.msg == "pc" ? "Programa" : "Nota", "<input type=\"number\" min=\"0\" max=\"127\" " + key("number") + ' data-t="int" value="' + a.number + '">') +
+			(a.msg == "pc" ? "" : field(a.msg == "cc" ? "Valor" : "Velocity", "<input type=\"number\" min=\"0\" max=\"127\" " + key("value") + ' data-t="int" value="' + a.value + '">')) + "</div>";
+	}
+	// Rango de los cegados: los pads con «cegado» en la etiqueta, o capa 2 clips 9–16 (mapa de Deseo54)
+	function guessBlindRange() {
+		const found = [];
+		G.allDevices(cfg).forEach((dv) => dv.pads.forEach((d) => { if (d.type == "clip" && /cegad/i.test(d.label || "")) found.push(d); }));
+		if (!found.length) return { layer: 2, from: 9, to: 16 };
+		const layer = found[0].layer, clips = found.filter((d) => d.layer == layer).map((d) => d.clip);
+		return { layer: layer, from: Math.min.apply(null, clips), to: Math.max.apply(null, clips) };
+	}
 
 	// ---------- pestaña Opciones ----------
 
@@ -1021,6 +1169,8 @@
 		renderInspector();
 		renderResolume();
 		renderTargets();
+		renderLinks();
+		renderDevBar();
 		renderOptions();
 		renderExport();
 		renderWarnings();

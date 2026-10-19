@@ -82,6 +82,8 @@ main { flex: 1; display: flex; min-height: 0; }
 .seg button { border: 0; border-radius: 0; border-right: 1px solid var(--line); padding: 5px 9px; }
 .seg button:last-child { border-right: 0; }
 .seg button.on { background: var(--accent); color: #111; }
+#devBar .seg button small { color: inherit; opacity: .7; margin-left: 4px; }
+.lnk-head { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
 
 /* ---------- el aparato ---------- */
 .device {
@@ -231,6 +233,7 @@ dialog::backdrop { background: #000a; }
 </header>
 <main id="apcMain">
 	<section id="left">
+		<div class="previewbar" id="devBar"></div>
 		<div class="previewbar">
 			<span class="dim">Vista previa:</span>
 			<div class="seg" id="previewSeg">
@@ -250,12 +253,14 @@ dialog::backdrop { background: #000a; }
 		<nav class="tabs" id="tabs">
 			<button data-tab="ctl" class="on">Control</button>
 			<button data-tab="res">Resolume</button>
+			<button data-tab="lnk">Enlaces</button>
 			<button data-tab="opt">Opciones</button>
 			<button data-tab="exp">Exportar</button>
 			<button data-tab="help">Ayuda</button>
 		</nav>
 		<div class="tabpane on" id="tab-ctl"></div>
 		<div class="tabpane" id="tab-res"></div>
+		<div class="tabpane" id="tab-lnk"></div>
 		<div class="tabpane" id="tab-opt"></div>
 		<div class="tabpane" id="tab-exp"></div>
 		<div class="tabpane help" id="tab-help"></div>

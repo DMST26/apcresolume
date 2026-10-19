@@ -25,12 +25,13 @@ Además incluye un **constructor de Resolume Remote**: diseñas arrastrando tu p
 4. [Uso diario: cambiar el mapa](#uso-diario-cambiar-el-mapa)
 5. [El configurador](#el-configurador)
 6. [Sunlite y otros programas](#sunlite-y-otros-programas)
-7. [Resolume Remote](#resolume-remote)
-8. [Cómo funciona por dentro](#cómo-funciona-por-dentro)
-9. [Velocidad de clip (el fader 7)](#velocidad-de-clip-el-fader-7)
-10. [Solución de problemas](#solución-de-problemas)
-11. [Referencia técnica](#referencia-técnica)
-12. [Desarrollo](#desarrollo)
+7. [Dos APC, enlaces y luces](#dos-apc-enlaces-y-luces)
+8. [Resolume Remote](#resolume-remote)
+9. [Cómo funciona por dentro](#cómo-funciona-por-dentro)
+10. [Velocidad de clip (el fader 7)](#velocidad-de-clip-el-fader-7)
+11. [Solución de problemas](#solución-de-problemas)
+12. [Referencia técnica](#referencia-técnica)
+13. [Desarrollo](#desarrollo)
 
 ---
 
@@ -52,10 +53,11 @@ A partir de ahí, para cambiar el mapa basta con editarlo y volver a guardar. Ch
 |---|---|
 | `configurador.html` | **La aplicación.** Un solo archivo: se abre con doble clic, sin instalar nada y sin internet. Tiene dos modos: **APC mini** y **Resolume Remote**. |
 | `remote-ejemplo.html` | Un remote ya hecho (clips de 3 capas y una página de mezcla) para probarlo tal cual. |
-| `chataigne/` | Todo listo para Chataigne con el mapa de Deseo54: los 3 scripts, `apc_config.json` y `APC_Resolume.noisette`. |
+| `chataigne/` | Todo listo para Chataigne con el mapa de Deseo54: los 4 scripts, `apc_config.json` y `APC_Resolume.noisette`. |
 | `chataigne/apc_config.json` | El mapa: qué hace cada control. Es lo único que cambia en el día a día. |
-| `chataigne/apc_to_resolume.js` | Script del módulo MIDI `apc`: lo que pulsas sale hacia Resolume y los demás destinos. |
-| `chataigne/resolume_to_apc.js` | Script del módulo OSC `resolume`: pinta los LEDs según el estado de los clips y sincroniza el tempo. |
+| `chataigne/apc_to_resolume.js` | Script de cada APC (módulos MIDI `apc`, `apc2`…): lo que pulsas sale hacia Resolume y los demás destinos. |
+| `chataigne/resolume_to_apc.js` | Script del módulo OSC `resolume`: pinta los LEDs de todos los APC según el estado de los clips, sincroniza el tempo y ejecuta los **enlaces**. |
+| `chataigne/destino_a_apc.js` | Script de los módulos de destino (p. ej. `sunlite`): enciende los LEDs según lo que devuelve ese programa. |
 | `chataigne/resolume_api.js` | Script del módulo HTTP `resolumeapi`: R/G/B del clip seleccionado, clip anterior/siguiente y velocidad por WebSocket. |
 | `src/` | Código fuente (ver [Desarrollo](#desarrollo)). |
 | `tests/` | Pruebas automáticas, con tus scripts originales como referencia. |
@@ -231,6 +233,48 @@ En **Destinos**, pulsa **+ Destino OSC** y pon la IP y el puerto del programa. T
 
 ---
 
+## Dos APC, enlaces y luces
+
+Todo pasa por Chataigne, así que Resolume y la iluminación (Sunlite) se pueden manejar desde uno o varios APC y coordinarse entre sí.
+
+### Varios APC (hasta 4)
+
+En la barra **APC** de arriba del configurador, pulsa **+ Añadir APC**. Cada APC tiene su propio mapa completo (pads, botones, faders y shift) y en Chataigne es **otro módulo MIDI**: `apc2`, `apc3`…
+
+Un reparto típico:
+- **APC 1 (`apc`):** Resolume, como hasta ahora.
+- **APC 2 (`apc2`):** Sunlite. Escenas en los pads (*Mensaje MIDI* con destino `sunlite`), dimmer y velocidad en los faders (*MIDI CC*), blackout en un botón lateral.
+
+Cualquier control de cualquier APC puede mandar a Resolume, a Sunlite o **a los dos a la vez** con «Además, enviar…». Por ejemplo, un pad de strobo lanza el clip y a la vez la escena de strobo de las luces.
+
+**En Chataigne:**
+- Crea un módulo MIDI llamado **exactamente `apc2`**. Su entrada y su salida son el segundo APC; Windows suele llamarlo «2- APC mini mk2».
+- Ponle el **mismo script** `apc_to_resolume.js`. Cada copia del script mira cómo se llama su módulo y usa el mapa de ese APC.
+- El `.noisette` exportado ya trae el módulo con su script; solo falta elegir el puerto.
+- Los LEDs, el tempo y los pads R/G/B funcionan en todos los APC.
+
+### Enlaces: un cegado de pantalla = blackout de luces
+
+Ve a la pestaña **Enlaces** y pulsa **+ Cegados → blackout de Sunlite**. Se crea la regla:
+
+> *Mientras suene algún clip de la capa 2, clips 9–16 (los cegados), manda la nota 50 a Sunlite; cuando no suene ninguno, la apaga.*
+
+- **Sigue el estado real de Resolume**, no solo el momento de pulsar el pad: da igual que el cegado lo lances desde el APC, desde la tablet o desde el propio Resolume. Si pasas de un cegado a otro, el blackout se mantiene.
+- **En Sunlite:** asigna esa nota (canal 1, nota 50) al blackout o a la escena que quieras con el aprendizaje MIDI. Si ya usas otra nota, cámbiala en el enlace.
+- **Funcionan con cualquier capa y rango de clips**, y pueden mandar hasta 4 cosas: notas, CC, program change u OSC (también a Resolume).
+- **Encendido y apagado:** con *Nota*, se manda note on mientras suena y note off al parar. Con *CC*, el valor mientras suena y 0 al parar. Con *OSC*, el valor y luego 0.
+- Los ejecuta el script `resolume_to_apc.js`, que ya pregunta a Resolume el estado de los clips cada segundo.
+
+Si lo que quieres es que el blackout dure solo **mientras mantienes pulsado** el pad, usa en ese pad «Además, enviar… → MIDI» en modo **Mantener**.
+
+### LEDs según Sunlite
+
+En un pad o botón que manda a Sunlite, marca **«LED según lo que devuelva el programa»**. Su LED deja de seguir a tus pulsaciones y pasa a seguir lo que Sunlite devuelve por esa misma nota o CC. Así el pad muestra si la escena está activa, aunque la actives desde el propio Sunlite.
+
+- **En Sunlite:** activa la **salida MIDI** (feedback) por el mismo puerto de loopMIDI.
+- **En Chataigne:** el módulo `sunlite` necesita el script **`destino_a_apc.js`**. El `.noisette` exportado ya lo trae.
+- **Modo recomendado: «Pulso».** Normalmente es Sunlite quien decide si la escena se enciende o se apaga.
+
 ## Resolume Remote
 
 En la parte de arriba del configurador, cambia a **Resolume Remote**. Ahí diseñas un mando táctil para el móvil o la tablet, con las páginas y los controles que quieras, conectado directamente a Resolume por su WebSocket: no necesita Chataigne ni el APC. Se exporta como **un único archivo `remote.html`**.
@@ -349,10 +393,11 @@ No se ha cambiado la arquitectura que ya funcionaba:
 | Módulo | Tipo | Configuración | Script |
 |---|---|---|---|
 | `apc` | MIDI | Entrada y salida **APC mini mk2** | `apc_to_resolume.js` |
+| `apc2`… (opcional) | MIDI | Entrada y salida del segundo APC | `apc_to_resolume.js` (el mismo) |
 | `resolume` | OSC | Escucha en **7001**, envía a **127.0.0.1:7000** | `resolume_to_apc.js` |
 | `resolumeapi` | HTTP | `http://127.0.0.1:8080/api/v1/`, JSON, Auto add desactivado | `resolume_api.js` |
 | `resolumews` | WebSocket Client | `127.0.0.1:8080/api/v1`, Auto add desactivado | ninguno. Solo hace falta con el método de velocidad «WebSocket» |
-| *destinos* | MIDI u OSC | los que crees | ninguno |
+| *destinos* (p. ej. `sunlite`) | MIDI u OSC | los que crees; Auto Add activado | `destino_a_apc.js` (para los LEDs según el programa) |
 
 ### El mapa vive fuera de los scripts
 
@@ -370,6 +415,8 @@ Antes, el mapa estaba escrito a mano dentro de los tres scripts y tenía que coi
   - Usa solo `/connected`. **Ignora `/connect`**, que es el disparo y vale 1 aunque el clip esté sonando.
   - Cada segundo pregunta con `"?"` el estado de todos los clips y el tempo. Cada 5 segundos repinta todo, por si se ha perdido algún mensaje.
   - Pasa el BPM al módulo `apc`, que manda reloj MIDI al APC para que pulsos y parpadeos vayan a tempo.
+- **`resolume_to_apc.js`** también pinta los APC extra y ejecuta los **enlaces**: guarda el estado de cada clip de su rango y, cuando pasa de «ninguno suena» a «alguno suena» o al revés, manda las acciones encendidas o apagadas.
+- **`destino_a_apc.js`** (en los módulos de destino) recibe `noteOnEvent`, `noteOffEvent`, `ccEvent` u `oscEvent` del programa y pinta los LEDs de los controles con «LED según el programa».
 - **`resolume_api.js`** consulta la API web para lo que necesita leer el estado de Resolume:
   - los R/G/B del clip seleccionado, 5 veces por segundo;
   - el clip anterior o siguiente;
@@ -446,12 +493,13 @@ Si el clip pasa a ir al doble de velocidad, el método PUT funciona.
 1. Que los tres scripts cargan `apc_config.json`. Lo verás en el Logger.
 2. La velocidad de clip por **PUT** (fader 7).
 3. El `.noisette` generado: el módulo `resolumews` y los módulos de destinos se han escrito con el mismo formato que los de tu archivo, pero no se han abierto en Chataigne. Si da problemas, usa la **opción A** y crea esos módulos a mano.
-4. Sunlite por loopMIDI.
-5. **Resolume Remote con tu Resolume 7.26.** El protocolo está sacado de la documentación oficial y del ejemplo oficial de Resolume, pero no se ha probado contra un Resolume real. Lo primero que hay que comprobar:
+4. Sunlite por loopMIDI, con el **enlace del cegado** (que el blackout entre y salga con el clip) y, si lo usas, el **LED según Sunlite** (Sunlite tiene que mandar MIDI de vuelta).
+5. **Segundo APC:** créalo como módulo `apc2` (o con el `.noisette`) y comprueba que sus pads hacen lo de su mapa y no lo del APC 1.
+6. **Resolume Remote con tu Resolume 7.26.** El protocolo está sacado de la documentación oficial y del ejemplo oficial de Resolume, pero no se ha probado contra un Resolume real. Lo primero que hay que comprobar:
    - que **Leer de Resolume** trae tu composición;
    - que en el modo **Con Resolume** se lanzan clips y se mueven los faders;
    - que el remote se abre desde la **Root Directory** en la tablet.
-6. **Remote con Chataigne 1.10.4:** activa OSC Remote Control y comprueba en el constructor que **Leer de Chataigne** trae tus módulos, y que un fader de una variable personalizada la mueve en Chataigne.
+7. **Remote con Chataigne 1.10.4:** activa OSC Remote Control y comprueba en el constructor que **Leer de Chataigne** trae tus módulos, y que un fader de una variable personalizada la mueve en Chataigne.
 
 ---
 
@@ -464,6 +512,8 @@ Si el clip pasa a ir al doble de velocidad, el método PUT funciona.
 | El clip que suena aparece como «cargado» | Algo está usando `/connect` en vez de `/connected`. Los scripts de este repositorio ya lo ignoran. |
 | El Logger dice «No hay mapa» | Falta `apc_config.json` en la misma carpeta que los scripts. Exporta otra vez. |
 | El Logger dice «No se pudo leer … (¿JSON roto?)» | El archivo está mal escrito. El script sigue con el mapa anterior. Vuelve a guardarlo desde el configurador. |
+| El APC 2 hace lo mismo que el APC 1 | Su módulo en Chataigne no se llama igual que en el mapa (`apc2`). El Logger avisa: «El mapa no tiene un APC llamado…». |
+| El blackout del enlace no sale | Mira en el Logger si existe el módulo `sunlite`; activa **debug** en Opciones para ver «enlace 1 activado». |
 | «No existe el módulo "sunlite"» | Crea en Chataigne un módulo con ese nombre exacto, o usa el `.noisette` exportado. |
 | R/G/B al 10 % siempre | No hay clip seleccionado en Resolume, o está vacío. Es normal. |
 | «Leer composición» falla | El navegador bloquea leer Resolume desde un archivo local. Usa **Cargar desde archivo…** (ver la pestaña Resolume). |
@@ -603,12 +653,14 @@ Las pruebas no necesitan Chataigne ni Resolume: simulan el entorno de scripts de
   - OSC libre e interruptores;
   - destinos MIDI y OSC, y acciones extra;
   - recarga del mapa y JSON roto;
-  - mapa incluido en el script y velocidad por PUT y por WebSocket.
+  - mapa incluido en el script y velocidad por PUT y por WebSocket;
+  - dos APC con mapas distintos, enlaces (cegado → blackout) y LEDs según lo que devuelve Sunlite.
 - **`generator.test.js`** prueba la normalización, la composición de Resolume, el aviso de clips movidos y el ZIP.
 - **`remote.test.js`** prueba el remote:
   - el catálogo de parámetros (efectos por nombre, nombres repetidos, parámetros con espacios);
   - el paso de rutas a ids y las acciones por id;
   - el simulador, la revisión del asistente y el generador de remotes.
+- **`e2e/apc.e2e.js`** prueba en Chromium varios APC, el LED según Sunlite, el enlace del cegado y la exportación.
 - **`e2e/remote.e2e.js`** prueba en Chromium el remote exportado y el constructor contra el Resolume de mentira.
 - **`check_chataigne_syntax.js`** comprueba que los scripts no usan nada que el motor JavaScript de Chataigne (JUCE) no entienda: `let`, `const`, funciones flecha, expresiones regulares, `switch`, métodos modernos de array…
 

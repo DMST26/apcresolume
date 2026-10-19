@@ -328,13 +328,16 @@
 				ref: ref, kind: "name", which: which, moveTo: found
 			});
 		}
-		c.pads.forEach(function (d, i) {
-			if (d.type != "clip" && d.type != "dual") return;
-			one(G.padName(i), { pad: i }, d.layer, d.clip, d.name, 1);
-			if (d.type == "dual") one(G.padName(i) + " (2.º clip)", { pad: i }, d.layer2, d.clip2, d.name2, 2);
-		});
-		c.faders.forEach(function (f, i) {
-			if (f.type == "clipSpeed") one("Fader " + (i + 1), { fader: i }, f.layer, f.clip, f.name, 1);
+		G.allDevices(c).forEach(function (dv, di) {
+			var pre = di ? (dv.label || dv.id) + " · " : "";
+			dv.pads.forEach(function (d, i) {
+				if (d.type != "clip" && d.type != "dual") return;
+				one(pre + G.padName(i), { pad: i, device: di }, d.layer, d.clip, d.name, 1);
+				if (d.type == "dual") one(pre + G.padName(i) + " (2.º clip)", { pad: i, device: di }, d.layer2, d.clip2, d.name2, 2);
+			});
+			dv.faders.forEach(function (f, i) {
+				if (f.type == "clipSpeed") one(pre + "Fader " + (i + 1), { fader: i, device: di }, f.layer, f.clip, f.name, 1);
+			});
 		});
 		return res;
 	};
