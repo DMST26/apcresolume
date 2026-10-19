@@ -9,8 +9,9 @@
 	G.MAX_EXTRA = 4;
 	// nombres de módulo que ya usa el puente y no pueden ser destinos nuevos
 	G.RESERVED_TARGETS = ["apc", "resolume", "resolumeapi", "resolumews"];
+	G.MAX_DEVICES = 4; // APC en total (el principal + 3)
 	G.CONFIG_MARKER = "var EMBEDDED_CONFIG = null; // @@CONFIG@@";
-	G.SCRIPT_NAMES = ["apc_to_resolume.js", "resolume_to_apc.js", "resolume_api.js"];
+	G.SCRIPT_NAMES = ["apc_to_resolume.js", "resolume_to_apc.js", "resolume_api.js", "destino_a_apc.js"];
 
 	function int(v, def, min, max) {
 		var n = parseInt(v, 10);
@@ -86,7 +87,48 @@
 			o.channel = int(d.channel, 1, 1, 16);
 			o.number = int(d.number, 0, 0, 127);
 			o.value = int(d.value, 127, 0, 127);
+			// el LED del control sigue lo que devuelve el programa por esa misma nota o CC
+			if (d.feedback) o.feedback = true;
 		}
+	}
+
+	function cleanId(s) {
+		return String(s || "").toLowerCase().split("").filter(function (ch) { return /[a-z0-9]/.test(ch); }).join("");
+	}
+
+	// Mapa de un APC (pads, botones, shift y faders) dentro de `out`
+	function normDevice(c, out) {
+		var i;
+		out.pads = []; out.bottom = []; out.side = []; out.faders = [];
+		for (i = 0; i < 64; i++) out.pads.push(normControl(c.pads && c.pads[i], true));
+		for (i = 0; i < 8; i++) out.bottom.push(normControl(c.bottom && c.bottom[i], false));
+		for (i = 0; i < 8; i++) out.side.push(normControl(c.side && c.side[i], false));
+		out.shift = normControl(c.shift, false);
+		for (i = 0; i < 9; i++) out.faders.push(normFader(c.faders && c.faders[i]));
+		return out;
+	}
+
+	// Enlace: mientras suene algún clip de la capa (clips from..to), se mandan sus acciones;
+	// al dejar de sonar, se mandan "apagadas" (0, note off...).
+	function normLink(l) {
+		l = l || {};
+		var o = {
+			label: String(l.label || ""),
+			enabled: l.enabled !== false,
+			layer: int(l.layer, 1, 1),
+			from: int(l.from, 1, 1),
+			to: int(l.to, 1, 1),
+			actions: []
+		};
+		if (o.to < o.from) o.to = o.from;
+		(l.actions || []).slice(0, G.MAX_EXTRA).forEach(function (a) {
+			var x = { type: a && a.type == "osc" ? "osc" : "midi" };
+			copyAction(x, a || {}, x.type);
+			delete x.mode;
+			delete x.feedback;
+			o.actions.push(x);
+		});
+		return o;
 	}
 
 	function normTarget(t) {
@@ -135,6 +177,8 @@
 			targets: [],
 			pads: [], bottom: [], side: [],
 			shift: null, faders: [],
+			devices: [],
+			links: [],
 			options: {}
 		};
 		var L = c.layers || {};
@@ -143,11 +187,17 @@
 			var n = normTarget(t);
 			if (n.id && G.RESERVED_TARGETS.indexOf(n.id) < 0 && !out.targets.some(function (x) { return x.id == n.id; })) out.targets.push(n);
 		});
-		for (i = 0; i < 64; i++) out.pads.push(normControl(c.pads && c.pads[i], true));
-		for (i = 0; i < 8; i++) out.bottom.push(normControl(c.bottom && c.bottom[i], false));
-		for (i = 0; i < 8; i++) out.side.push(normControl(c.side && c.side[i], false));
-		out.shift = normControl(c.shift, false);
-		for (i = 0; i < 9; i++) out.faders.push(normFader(c.faders && c.faders[i]));
+		normDevice(c, out);
+		// APC adicionales: mismo formato, con su nombre de módulo en Chataigne (apc2, apc3...)
+		var used = ["apc"].concat(G.RESERVED_TARGETS, out.targets.map(function (t) { return t.id; }));
+		(c.devices || []).forEach(function (d) {
+			if (out.devices.length >= G.MAX_DEVICES - 1) return;
+			var id = cleanId(d && d.id);
+			if (!id || used.indexOf(id) >= 0) { var n = 2; while (used.indexOf("apc" + n) >= 0) n++; id = "apc" + n; }
+			used.push(id);
+			out.devices.push(normDevice(d || {}, { id: id, label: String((d && d.label) || "") }));
+		});
+		(c.links || []).forEach(function (l) { out.links.push(normLink(l)); });
 		var op = c.options || {};
 		out.options = {
 			tempoSync: op.tempoSync !== false,
@@ -182,13 +232,22 @@
 			checkAction(d, where, ref);
 			(d.extra || []).forEach(function (a, k) { checkAction(a, where + " (extra " + (k + 1) + ")", ref); });
 		}
-		c.pads.forEach(function (d, i) { checkControl(d, G.padName(i), { pad: i }); });
-		[["bottom", "Botón de abajo "], ["side", "Botón lateral "]].forEach(function (g) {
-			c[g[0]].forEach(function (d, i) { checkControl(d, g[1] + (i + 1), { group: g[0], index: i }); });
+		G.allDevices(c).forEach(function (dv, di) {
+			var pre = di ? (dv.label || dv.id) + " · " : "";
+			function ref(r) { r.device = di; return r; }
+			dv.pads.forEach(function (d, i) { checkControl(d, pre + G.padName(i), ref({ pad: i })); });
+			[["bottom", "Botón de abajo "], ["side", "Botón lateral "]].forEach(function (g) {
+				dv[g[0]].forEach(function (d, i) { checkControl(d, pre + g[1] + (i + 1), ref({ group: g[0], index: i })); });
+			});
+			checkControl(dv.shift, pre + "Shift", ref({ group: "shift", index: 0 }));
+			dv.faders.forEach(function (f, i) {
+				if (f.type == "osc" || f.type == "midiCC") checkAction({ type: f.type == "osc" ? "osc" : "midi", target: f.target, address: f.address }, pre + "Fader " + (i + 1), ref({ fader: i }));
+			});
 		});
-		checkControl(c.shift, "Shift", { group: "shift", index: 0 });
-		c.faders.forEach(function (f, i) {
-			if (f.type == "osc" || f.type == "midiCC") checkAction({ type: f.type == "osc" ? "osc" : "midi", target: f.target, address: f.address }, "Fader " + (i + 1), { fader: i });
+		(c.links || []).forEach(function (l, i) {
+			var where = "Enlace " + (i + 1) + (l.label ? " («" + l.label + "»)" : "");
+			if (!l.actions.length) add("aviso", where + ": no hace nada todavía (añade una acción)", { link: i });
+			l.actions.forEach(function (a) { checkAction(a, where, { link: i }); });
 		});
 		var seen = {};
 		c.pads.forEach(function (d, i) {
@@ -204,6 +263,11 @@
 		});
 		if (composition) G.checkNames(c, composition).forEach(function (r) { res.push(r); });
 		return res;
+	};
+
+	// El APC principal (los campos de arriba del mapa) y los adicionales, con su módulo de Chataigne
+	G.allDevices = function (c) {
+		return [{ id: "apc", label: "APC 1", pads: c.pads, bottom: c.bottom, side: c.side, shift: c.shift, faders: c.faders }].concat(c.devices || []);
 	};
 
 	G.padName = function (i) { return "Pad fila " + (Math.floor(i / 8) + 1) + " · " + ((i % 8) + 1); };
@@ -289,7 +353,7 @@
 
 	// .noisette a partir del que ya funciona: cambia la ruta de los scripts y añade el módulo
 	// WebSocket "resolumews" si no está. Todo lo demás se deja tal cual.
-	G.buildNoisette = function (template, folder, targets) {
+	G.buildNoisette = function (template, folder, targets, devices) {
 		var n = JSON.parse(JSON.stringify(template));
 		folder = String(folder || "").split("\\").join("/").replace(/\/+$/, "");
 		var SCRIPT_OF = { apc: "apc_to_resolume", resolume: "resolume_to_apc", resolumeapi: "resolume_api" };
@@ -304,11 +368,43 @@
 			});
 		});
 		if (!hasWs) n.modules.items.push(G.WS_MODULE());
+		// APC adicionales: módulo MIDI con el mismo script que el principal
+		(devices || []).forEach(function (d) {
+			if (n.modules.items.some(function (m) { return m.niceName == d.id; })) return;
+			n.modules.items.push(G.APC_MODULE(d.id, folder));
+		});
 		(targets || []).forEach(function (t, i) {
 			if (n.modules.items.some(function (m) { return m.niceName == t.id; })) return;
-			n.modules.items.push(t.type == "osc" ? G.OSC_TARGET_MODULE(t, 9100 + i) : G.MIDI_TARGET_MODULE(t));
+			var m = t.type == "osc" ? G.OSC_TARGET_MODULE(t, 9100 + i) : G.MIDI_TARGET_MODULE(t);
+			// lo que devuelve el programa enciende los LEDs de los controles con «LED según el programa»
+			m.scripts = { items: [G.SCRIPT_ITEM(folder, "destino_a_apc")], viewOffset: [0, 0], viewZoom: 1.0 };
+			n.modules.items.push(m);
 		});
 		return JSON.stringify(n);
+	};
+
+	G.SCRIPT_ITEM = function (folder, name) {
+		return { parameters: [{ value: folder + "/" + name + ".js", controlAddress: "/filePath" }], niceName: name, type: "BaseItem", scriptParams: {} };
+	};
+
+	// Módulo MIDI de un APC adicional (apc2...). El puerto ("2- APC mini mk2"...) se elige en Chataigne.
+	G.APC_MODULE = function (id, folder) {
+		return {
+			parameters: [{ value: true, controlAddress: "/enabled" }],
+			niceName: id,
+			type: "MIDI",
+			scripts: { items: [G.SCRIPT_ITEM(folder, "apc_to_resolume")], viewOffset: [0, 0], viewZoom: 1.0 },
+			params: {
+				parameters: [
+					{ value: false, controlAddress: "/autoAdd" },
+					{ value: false, controlAddress: "/useHierarchy" },
+					{ value: false, controlAddress: "/usePitchForNoteNames" }
+				],
+				containers: { pass_through: {} }
+			},
+			templates: { viewOffset: [0, 0], viewZoom: 1.0 },
+			values: {}
+		};
 	};
 
 	// Módulo MIDI de un destino. El puerto se elige en Chataigne (los ids de Windows no se pueden adivinar).
@@ -374,7 +470,7 @@
 		opts = opts || {};
 		var files = [{ name: "apc_config.json", text: G.configJSON(c) }];
 		if (opts.scripts !== false) G.SCRIPT_NAMES.forEach(function (n) { files.push({ name: n, text: G.buildScript(templates[n], c) }); });
-		if (opts.noisette && noisetteTemplate) files.push({ name: "APC_Resolume.noisette", text: G.buildNoisette(noisetteTemplate, opts.folder, c.targets) });
+		if (opts.noisette && noisetteTemplate) files.push({ name: "APC_Resolume.noisette", text: G.buildNoisette(noisetteTemplate, opts.folder, c.targets, c.devices) });
 		return files;
 	};
 

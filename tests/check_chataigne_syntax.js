@@ -15,7 +15,8 @@ var RULES = [
 	[/new\s+RegExp|\.(match|replace|test|search)\s*\(/, "expresiones regulares"],
 	[/(^|[=(,:!&|?{};]\s*)\/[^/*\s]/, "posible expresión regular literal"],
 	[/\.\.\./, "spread"],
-	[/\btry\s*\{/, "try/catch"]
+	[/\btry\s*\{/, "try/catch"],
+	[/\bfunction\s*\(/, "función anónima (el motor de Chataigne busca las variables por quién llama: mejor evitarlas)"]
 ];
 
 var ROOT = path.join(__dirname, "..");

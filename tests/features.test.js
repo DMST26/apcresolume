@@ -30,13 +30,15 @@ function setup(cfg, opts) {
 	opts = opts || {};
 	var files = {};
 	if (cfg) files[FILE] = JSON.stringify(cfg);
-	var rig = createRig({ files: files, withWs: opts.withWs, targets: opts.targets });
+	var rig = createRig({ files: files, withWs: opts.withWs, targets: opts.targets, devices: opts.devices });
 	var dir = opts.dir || path.join(ROOT, "src", "scripts");
 	var s = {
 		apc: rig.load(path.join(dir, "apc_to_resolume.js"), "apc"),
 		leds: rig.load(path.join(dir, "resolume_to_apc.js"), "resolume"),
 		api: rig.load(path.join(dir, "resolume_api.js"), "resolumeapi")
 	};
+	(opts.devices || []).forEach(function (id) { s[id] = rig.load(path.join(dir, "apc_to_resolume.js"), id); s[id].init(); });
+	(opts.feedback || []).forEach(function (id) { s["fb_" + id] = rig.load(path.join(dir, "destino_a_apc.js"), id); s["fb_" + id].init(); });
 	s.apc.init(); s.leds.init(); s.api.init();
 	take(rig);
 	return { rig: rig, s: s };
@@ -158,6 +160,57 @@ var noi = JSON.parse(G.buildNoisette(JSON.parse(fs.readFileSync(path.join(ROOT, 
 var names = noi.modules.items.map(function (m) { return m.niceName + ":" + m.type; });
 eq(".noisette: módulos", names, ["apc:MIDI", "resolume:OSC", "resolumeapi:HTTP", "resolumews:WebSocket Client", "sunlite:MIDI", "luces:OSC"]);
 eq(".noisette: ruta de los scripts", noi.modules.items[0].scripts.items[0].parameters[0].value, "D:/Show/chataigne/apc_to_resolume.js");
+
+// ---------- dos APC: el segundo para Sunlite ----------
+c = clone(BASE);
+c.targets = [{ id: "sunlite", type: "midi", label: "Sunlite" }];
+var pads2 = [];
+for (var q = 0; q < 64; q++) pads2.push({ type: "none" });
+pads2[0] = { type: "midi", target: "sunlite", msg: "note", channel: 1, number: 40, value: 127, mode: "pulse", feedback: true, color: 45, led: { loaded: 1, active: 7 } };
+pads2[1] = { type: "midi", target: "sunlite", msg: "note", channel: 1, number: 41, value: 127, mode: "toggle", color: 21, led: { loaded: 1, active: 15 } };
+pads2[8] = { type: "clip", layer: 2, clip: 9, color: 3, led: { empty: 3, loaded: 3, active: 7 } };
+c.devices = [{ id: "apc2", label: "APC Sunlite", pads: pads2, faders: [{ type: "midiCC", target: "sunlite", channel: 1, number: 10, min: 0, max: 127 }] }];
+// enlace: mientras suene un cegado (capa 2, clips 9-16), blackout en Sunlite (nota 50)
+c.links = [{ label: "Cegado = BO luces", layer: 2, from: 9, to: 16, actions: [{ type: "midi", target: "sunlite", msg: "note", channel: 1, number: 50, value: 127 }] }];
+c = G.normalizeConfig(c);
+eq("dos APC: el mapa es válido", G.validateConfig(c), []);
+t = setup(c, { targets: { sunlite: "midi" }, devices: ["apc2"], feedback: ["sunlite"] });
+t.s.apc2.noteOnEvent(1, 1, 127); t.s.apc2.noteOffEvent(1, 1, 0);
+eq("APC 2: su propio mapa (pad a Sunlite) y su LED en el APC 2", take(t.rig), ["sunlite on 1 41 127", "apc2:midi 15 1 21"]);
+t.s.apc.noteOnEvent(1, 1, 127);
+ok("APC 1 sigue con su mapa", take(t.rig).indexOf("osc /composition/selectedclip/video/gscale 1") < 0);
+t.s.apc2.ccEvent(1, 48, 127);
+eq("APC 2: fader a Sunlite", take(t.rig), ["sunlite cc 1 10 127"]);
+t.s.leds.oscEvent("/composition/layers/2/clips/9/connected", [3]);
+var both = take(t.rig);
+ok("LEDs: el mismo clip se pinta en los dos APC", both.indexOf("midi 7 48 3") >= 0 && both.indexOf("apc2:midi 7 8 3") >= 0, JSON.stringify(both));
+ok("enlace: al sonar un cegado, blackout en Sunlite", both.indexOf("sunlite on 1 50 127") >= 0, JSON.stringify(both));
+t.s.leds.oscEvent("/composition/layers/2/clips/12/connected", [3]);
+t.s.leds.oscEvent("/composition/layers/2/clips/9/connected", [1]);
+ok("enlace: si suena otro cegado, sigue el blackout", take(t.rig).indexOf("sunlite off 1 50") < 0);
+t.s.leds.oscEvent("/composition/layers/2/clips/12/connected", [1]);
+ok("enlace: cuando no suena ninguno, se quita", take(t.rig).indexOf("sunlite off 1 50") >= 0);
+t.s.leds.update(1);
+ok("enlace: los clips del enlace también se sondean", take(t.rig).indexOf('osc /composition/layers/2/clips/16/connected "?"') >= 0);
+t.s.apc2.noteOnEvent(1, 0, 127);
+eq("feedback: el pad no pinta su LED al pulsar (lo pinta Sunlite)", take(t.rig), ["sunlite on 1 40 127", "sunlite off 1 40"]);
+t.s.fb_sunlite.noteOnEvent(1, 40, 127);
+eq("feedback: Sunlite devuelve la nota y se enciende el LED", take(t.rig), ["apc2:midi 7 0 45"]);
+t.s.fb_sunlite.noteOnEvent(1, 40, 127);
+eq("feedback: sin cambios no repinta", take(t.rig), []);
+t.s.fb_sunlite.noteOffEvent(1, 40, 0);
+eq("feedback: y se apaga", take(t.rig), ["apc2:midi 1 0 45"]);
+t.s.fb_sunlite.noteOnEvent(2, 40, 127);
+eq("feedback: otro canal no cuenta", take(t.rig), []);
+
+var noi2 = JSON.parse(G.buildNoisette(JSON.parse(fs.readFileSync(path.join(ROOT, "src", "noisette_template.json"), "utf8")), "D:/Show", c.targets, c.devices));
+var m2 = noi2.modules.items.filter(function (m) { return m.niceName == "apc2"; })[0];
+var ms = noi2.modules.items.filter(function (m) { return m.niceName == "sunlite"; })[0];
+ok(".noisette: módulo apc2 con el script del APC", m2 && m2.type == "MIDI" && m2.scripts.items[0].parameters[0].value == "D:/Show/apc_to_resolume.js");
+ok(".noisette: Sunlite con destino_a_apc.js y Auto Add", ms && ms.scripts.items[0].parameters[0].value == "D:/Show/destino_a_apc.js" && ms.params.parameters[0].value === true);
+
+var badDev = G.normalizeConfig({ devices: [{ id: "apc" }, { id: "resolume" }, { id: "apc2" }, { id: "x" }, { id: "y" }] });
+ok("APC extra: nombres que chocan se cambian y como mucho 4 APC", badDev.devices.map(function (d) { return d.id; }).join(",") == "apc2,apc3,apc4", badDev.devices.map(function (d) { return d.id; }).join(","));
 
 // ---------- recarga del mapa ----------
 t = setup(BASE);

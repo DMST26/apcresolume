@@ -8,6 +8,9 @@
 // Además de Resolume, cualquier control puede mandar OSC o MIDI a otros módulos de Chataigne
 // ("destinos" del mapa, por ejemplo un módulo MIDI "sunlite" con un puerto loopMIDI).
 //
+// Con dos o más APC, este mismo archivo va en cada módulo MIDI (apc, apc2...): cada copia usa el
+// mapa de su APC (cfg.devices, por el nombre del módulo).
+//
 // Notas del APC: pads 0-63 (0 = abajo a la izquierda), botones de abajo 100-107,
 // laterales 112-119 (112 = arriba), shift 122, faders CC 48-56.
 //
@@ -18,6 +21,7 @@ var CONFIG_FILE = "apc_config.json";
 var EMBEDDED_CONFIG = null; // @@CONFIG@@
 
 var cfg = null;
+var dev = null;        // mapa de ESTE APC (el mismo script sirve para apc, apc2...)
 var cfgText = "";
 var reloadTime = 0;
 
@@ -91,8 +95,24 @@ function runExtras(note, d, pressed) {
 
 function configPath() { return script.getScriptDirectory() + "/" + CONFIG_FILE; }
 
+// Mapa del APC de este módulo: "apc" = el principal; "apc2"... = cfg.devices
+function pickDevice() {
+	dev = cfg;
+	if (!cfg) return;
+	var me = local.name;
+	if (me == "apc" || !cfg.devices) return;
+	for (var i = 0; i < cfg.devices.length; i++) if (cfg.devices[i].id == me) { dev = cfg.devices[i]; return; }
+	script.logWarning("El mapa no tiene un APC llamado \"" + me + "\": uso el del APC principal.");
+}
+
 // Devuelve true si el mapa ha cambiado.
 function loadConfig() {
+	var changed = readConfig();
+	if (changed) pickDevice();
+	return changed;
+}
+
+function readConfig() {
 	var p = configPath();
 	if (util.fileExists(p)) {
 		var text = util.readFile(p);
@@ -122,17 +142,19 @@ function opt(name, def) {
 
 // Definición del control de una nota (pad, botón o shift).
 function defFor(note) {
-	if (!cfg) return null;
-	if (note >= 0 && note <= 63) return cfg.pads[note];
-	if (note >= TRACK_FIRST && note < TRACK_FIRST + 8) return cfg.bottom[note - TRACK_FIRST];
-	if (note >= SCENE_FIRST && note < SCENE_FIRST + 8) return cfg.side[note - SCENE_FIRST];
-	if (note == SHIFT) return cfg.shift;
+	if (!dev) return null;
+	if (note >= 0 && note <= 63) return dev.pads[note];
+	if (note >= TRACK_FIRST && note < TRACK_FIRST + 8) return dev.bottom[note - TRACK_FIRST];
+	if (note >= SCENE_FIRST && note < SCENE_FIRST + 8) return dev.side[note - SCENE_FIRST];
+	if (note == SHIFT) return dev.shift;
 	return null;
 }
 
 // LED de un control en reposo ("idle") o activado ("active").
 // Pads: canal = brillo/animación, velocity = color. Botones: canal 1, 0 apagado, 1 fijo, 2 parpadeo.
+// Si el LED sigue lo que devuelve el programa (feedback), lo pinta destino_a_apc.js, no este script.
 function ctlLed(note, d, on) {
+	if (d.feedback) return;
 	if (note <= 63) {
 		var ch = on ? d.led.active : d.led.loaded;
 		if (!ch) local.sendNoteOn(1, note, 0);
@@ -242,7 +264,7 @@ function update(deltaTime) {
 	// velocidad de clip: como mucho 20 envíos por segundo aunque el fader mande más
 	for (var i = 0; i < 9; i++) {
 		if (pendingSpeed[i] < 0) continue;
-		sendSpeed(cfg.faders[i], pendingSpeed[i]);
+		sendSpeed(dev.faders[i], pendingSpeed[i]);
 		pendingSpeed[i] = -1;
 	}
 	if (!opt("autoReload", true)) return;
@@ -281,10 +303,10 @@ function noteOffEvent(channel, pitch, velocity) {
 }
 
 function ccEvent(channel, number, value) {
-	if (!cfg) return;
+	if (!dev) return;
 	var i = number - FADER_FIRST;
 	if (i < 0 || i > 8) return;
-	var f = cfg.faders[i];
+	var f = dev.faders[i];
 	var x = value / 127.0;
 	var t = f.type;
 	if (t == "layerOpacity") resolume().send("/composition/layers/" + f.layer + "/video/opacity", x);
@@ -331,12 +353,12 @@ function sendSpeed(f, speed) {
 // Los pads de clips los pinta resolume_to_apc.js y los R/G/B resolume_api.js: aquí no se
 // tocan para no pisarse.
 function refresh() {
-	if (!cfg) return;
+	if (!dev) return;
 	var p, d, t, k, n;
 	var askBlackout = false;
 
 	for (p = 0; p < 64; p++) {
-		d = cfg.pads[p];
+		d = dev.pads[p];
 		t = d.type;
 		if (t == "clip" || t == "dual" || t == "rgb") continue;
 		if (t == "bypass" || t == "blackout") ctlLed(p, d, 0);
@@ -363,7 +385,7 @@ function refresh() {
 	if (askBlackout) resolume().send("/composition/bypassed", "?");
 
 	for (p = 0; p < 64; p++) {
-		d = cfg.pads[p];
+		d = dev.pads[p];
 		if (d.type == "clip" || d.type == "dual")
 			resolume().send("/composition/layers/" + d.layer + "/clips/" + d.clip + "/connected", "?");
 	}

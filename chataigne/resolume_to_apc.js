@@ -1,5 +1,6 @@
-// Resolume (OSC) -> LEDs del APC mini mk2
-// Script del módulo OSC "resolume". Escucha el estado de los clips y pinta los pads.
+// Resolume (OSC) -> LEDs de los APC mini mk2, y enlaces automáticos
+// Script del módulo OSC "resolume". Escucha el estado de los clips y pinta los pads de todos los APC
+// del mapa (el principal "apc" y los adicionales "apc2"...).
 //
 // El mapa se lee de apc_config.json (misma carpeta que el script), igual que apc_to_resolume.js.
 //
@@ -10,10 +11,14 @@
 // En el mk2 el canal MIDI es el brillo: 1=10% 2=25% 3=50% 4=65% 5=75% 6=90% 7=100%
 // 8-11 = pulso (1/16, 1/8, 1/4, 1/2), 12-16 = parpadeo (1/24, 1/16, 1/8, 1/4, 1/2). 0 = apagado.
 //
+// ENLACES (cfg.links): mientras suene algún clip de una capa (clips from..to) se mandan sus acciones
+// a otros programas (p. ej. blackout de Sunlite mientras suena un cegado) y al dejar de sonar se
+// mandan "apagadas" (0, note off).
+//
 // Generado por el configurador APC mini mk2 <-> Resolume.
 
 var CONFIG_FILE = "apc_config.json";
-var EMBEDDED_CONFIG = {"format":"apc-resolume","version":1,"name":"Deseo54 - DMST DESEO 54 PLANTILLAS","resolume":{"host":"127.0.0.1","apiPort":8080},"layers":{"1":"Visuales","2":"Strobos","3":"Outline","4":"pxel","5":"madrix"},"targets":[],"pads":[{"type":"rgb","label":"Rojo (R) del clip seleccionado","rgb":"r","color":5,"led":{"empty":1,"loaded":14,"active":7}},{"type":"rgb","label":"Verde (G) del clip seleccionado","rgb":"g","color":21,"led":{"empty":1,"loaded":14,"active":7}},{"type":"rgb","label":"Azul (B) del clip seleccionado","rgb":"b","color":45,"led":{"empty":1,"loaded":14,"active":7}},{"type":"none","label":"","color":0,"led":{"empty":0,"loaded":0,"active":0}},{"type":"clip","label":"Strobe negro","layer":2,"clip":17,"name":"","color":3,"led":{"empty":0,"loaded":3,"active":13}},{"type":"none","label":"","color":0,"led":{"empty":0,"loaded":0,"active":0}},{"type":"resync","label":"Resync","color":5,"led":{"empty":0,"loaded":7,"active":7}},{"type":"tap","label":"Tap tempo","color":9,"led":{"empty":0,"loaded":15,"active":15}},{"type":"clip","label":"Outline 9","layer":3,"clip":9,"name":"","color":57,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 10","layer":3,"clip":10,"name":"","color":3,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 11","layer":3,"clip":11,"name":"","color":57,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 12","layer":3,"clip":12,"name":"","color":57,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 13","layer":3,"clip":13,"name":"","color":3,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 14","layer":3,"clip":14,"name":"","color":57,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 15","layer":3,"clip":15,"name":"","color":57,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 16","layer":3,"clip":16,"name":"","color":57,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 1","layer":3,"clip":1,"name":"","color":57,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 2","layer":3,"clip":2,"name":"","color":57,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 3","layer":3,"clip":3,"name":"","color":57,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 4","layer":3,"clip":4,"name":"","color":57,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 5","layer":3,"clip":5,"name":"","color":57,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 6","layer":3,"clip":6,"name":"","color":57,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 7","layer":3,"clip":7,"name":"","color":57,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 8","layer":3,"clip":8,"name":"","color":57,"led":{"empty":0,"loaded":7,"active":15}},{"type":"dual","label":"B07 barrido lento","layer":4,"clip":9,"name":"","layer2":5,"clip2":8,"name2":"","color":37,"led":{"empty":0,"loaded":7,"active":15}},{"type":"dual","label":"B11 anillos","layer":4,"clip":13,"name":"","layer2":5,"clip2":12,"name2":"","color":37,"led":{"empty":0,"loaded":7,"active":15}},{"type":"dual","label":"B08 barrido rápido","layer":4,"clip":10,"name":"","layer2":5,"clip2":9,"name2":"","color":37,"led":{"empty":0,"loaded":7,"active":15}},{"type":"dual","label":"B13 destellos","layer":4,"clip":11,"name":"","layer2":5,"clip2":14,"name2":"","color":37,"led":{"empty":0,"loaded":7,"active":15}},{"type":"dual","label":"B01 negras (completo)","layer":4,"clip":3,"name":"","layer2":5,"clip2":2,"name2":"","color":13,"led":{"empty":0,"loaded":7,"active":15}},{"type":"dual","label":"B06 alterno","layer":4,"clip":8,"name":"","layer2":5,"clip2":7,"name2":"","color":5,"led":{"empty":0,"loaded":7,"active":15}},{"type":"dual","label":"B04 random","layer":4,"clip":6,"name":"","layer2":5,"clip2":5,"name2":"","color":13,"led":{"empty":0,"loaded":7,"active":15}},{"type":"dual","label":"B05 random rápido","layer":4,"clip":7,"name":"","layer2":5,"clip2":6,"name2":"","color":13,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 9","layer":1,"clip":9,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 10","layer":1,"clip":10,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 11","layer":1,"clip":11,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 12","layer":1,"clip":12,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 13","layer":1,"clip":13,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 14","layer":1,"clip":14,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 15","layer":1,"clip":15,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 16","layer":1,"clip":16,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 1","layer":1,"clip":1,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 2","layer":1,"clip":2,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 3","layer":1,"clip":3,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 4","layer":1,"clip":4,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 5","layer":1,"clip":5,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 6","layer":1,"clip":6,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 7","layer":1,"clip":7,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 8","layer":1,"clip":8,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Cegado blanco","layer":2,"clip":9,"name":"","color":3,"led":{"empty":3,"loaded":3,"active":7}},{"type":"clip","label":"Cegado rojo","layer":2,"clip":10,"name":"","color":5,"led":{"empty":3,"loaded":3,"active":7}},{"type":"clip","label":"Cegado naranja","layer":2,"clip":11,"name":"","color":9,"led":{"empty":3,"loaded":3,"active":7}},{"type":"clip","label":"Cegado amarillo","layer":2,"clip":12,"name":"","color":13,"led":{"empty":3,"loaded":3,"active":7}},{"type":"clip","label":"Cegado verde","layer":2,"clip":13,"name":"","color":21,"led":{"empty":3,"loaded":3,"active":7}},{"type":"clip","label":"Cegado cian","layer":2,"clip":14,"name":"","color":37,"led":{"empty":3,"loaded":3,"active":7}},{"type":"clip","label":"Cegado azul","layer":2,"clip":15,"name":"","color":45,"led":{"empty":3,"loaded":3,"active":7}},{"type":"clip","label":"Cegado magenta","layer":2,"clip":16,"name":"","color":53,"led":{"empty":3,"loaded":3,"active":7}},{"type":"clip","label":"Strobo blanco","layer":2,"clip":1,"name":"","color":3,"led":{"empty":10,"loaded":10,"active":7}},{"type":"clip","label":"Strobo rojo","layer":2,"clip":2,"name":"","color":5,"led":{"empty":10,"loaded":10,"active":7}},{"type":"clip","label":"Strobo naranja","layer":2,"clip":3,"name":"","color":9,"led":{"empty":10,"loaded":10,"active":7}},{"type":"clip","label":"Strobo amarillo","layer":2,"clip":4,"name":"","color":13,"led":{"empty":10,"loaded":10,"active":7}},{"type":"clip","label":"Strobo verde","layer":2,"clip":5,"name":"","color":21,"led":{"empty":10,"loaded":10,"active":7}},{"type":"clip","label":"Strobo cian","layer":2,"clip":6,"name":"","color":37,"led":{"empty":10,"loaded":10,"active":7}},{"type":"clip","label":"Strobo azul","layer":2,"clip":7,"name":"","color":45,"led":{"empty":10,"loaded":10,"active":7}},{"type":"clip","label":"Strobo magenta","layer":2,"clip":8,"name":"","color":53,"led":{"empty":10,"loaded":10,"active":7}}],"bottom":[{"type":"bypass","label":"Bypass Visuales","layers":[1],"led":{"idle":0,"active":2}},{"type":"bypass","label":"Bypass Outline","layers":[3],"led":{"idle":0,"active":2}},{"type":"bypass","label":"Bypass Strobos","layers":[2],"led":{"idle":0,"active":2}},{"type":"bypass","label":"Bypass Pixel","layers":[4],"led":{"idle":0,"active":2}},{"type":"bypass","label":"Bypass Madrix","layers":[5],"led":{"idle":0,"active":2}},{"type":"none","label":"","led":{"idle":0,"active":0}},{"type":"prev","label":"Clip anterior de Visuales","layer":1,"led":{"idle":0,"active":1}},{"type":"next","label":"Clip siguiente de Visuales","layer":1,"led":{"idle":0,"active":1}}],"side":[{"type":"clearAll","label":"Limpiar todo","led":{"idle":0,"active":1}},{"type":"clear","label":"Limpiar Strobos","layers":[2],"led":{"idle":0,"active":1}},{"type":"blackout","label":"Blackout","led":{"idle":0,"active":2}},{"type":"clear","label":"Limpiar Visuales","layers":[1],"led":{"idle":0,"active":1}},{"type":"clear","label":"Limpiar Outline","layers":[3],"led":{"idle":0,"active":1}},{"type":"clear","label":"Limpiar Pixel + Madrix","layers":[4,5],"led":{"idle":0,"active":1}},{"type":"none","label":"","led":{"idle":0,"active":0}},{"type":"refresh","label":"Refrescar LEDs","led":{"idle":0,"active":1}}],"shift":{"type":"refresh","label":"Refrescar LEDs","led":{"idle":0,"active":0}},"faders":[{"type":"layerOpacity","label":"Visuales","layer":1},{"type":"layerOpacity","label":"Outline","layer":3},{"type":"layerOpacity","label":"Pixel","layer":4},{"type":"layerOpacity","label":"Madrix","layer":5},{"type":"none","label":""},{"type":"none","label":""},{"type":"clipSpeed","label":"Velocidad Outline clip 10","layer":3,"clip":10,"min":0.25,"max":4,"name":""},{"type":"layerMaster","label":"Master Strobos","layer":2},{"type":"compMaster","label":"Master composición"}],"options":{"tempoSync":true,"pollHz":1,"repaintEvery":5,"rgbHz":5,"speedMethod":"put","autoReload":true,"debug":false}}; // mapa incluido: "Deseo54 - DMST DESEO 54 PLANTILLAS"
+var EMBEDDED_CONFIG = {"format":"apc-resolume","version":1,"name":"Deseo54 - DMST DESEO 54 PLANTILLAS","resolume":{"host":"127.0.0.1","apiPort":8080},"layers":{"1":"Visuales","2":"Strobos","3":"Outline","4":"pxel","5":"madrix"},"targets":[],"pads":[{"type":"rgb","label":"Rojo (R) del clip seleccionado","rgb":"r","color":5,"led":{"empty":1,"loaded":14,"active":7}},{"type":"rgb","label":"Verde (G) del clip seleccionado","rgb":"g","color":21,"led":{"empty":1,"loaded":14,"active":7}},{"type":"rgb","label":"Azul (B) del clip seleccionado","rgb":"b","color":45,"led":{"empty":1,"loaded":14,"active":7}},{"type":"none","label":"","color":0,"led":{"empty":0,"loaded":0,"active":0}},{"type":"clip","label":"Strobe negro","layer":2,"clip":17,"name":"","color":3,"led":{"empty":0,"loaded":3,"active":13}},{"type":"none","label":"","color":0,"led":{"empty":0,"loaded":0,"active":0}},{"type":"resync","label":"Resync","color":5,"led":{"empty":0,"loaded":7,"active":7}},{"type":"tap","label":"Tap tempo","color":9,"led":{"empty":0,"loaded":15,"active":15}},{"type":"clip","label":"Outline 9","layer":3,"clip":9,"name":"","color":57,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 10","layer":3,"clip":10,"name":"","color":3,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 11","layer":3,"clip":11,"name":"","color":57,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 12","layer":3,"clip":12,"name":"","color":57,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 13","layer":3,"clip":13,"name":"","color":3,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 14","layer":3,"clip":14,"name":"","color":57,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 15","layer":3,"clip":15,"name":"","color":57,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 16","layer":3,"clip":16,"name":"","color":57,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 1","layer":3,"clip":1,"name":"","color":57,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 2","layer":3,"clip":2,"name":"","color":57,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 3","layer":3,"clip":3,"name":"","color":57,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 4","layer":3,"clip":4,"name":"","color":57,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 5","layer":3,"clip":5,"name":"","color":57,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 6","layer":3,"clip":6,"name":"","color":57,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 7","layer":3,"clip":7,"name":"","color":57,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Outline 8","layer":3,"clip":8,"name":"","color":57,"led":{"empty":0,"loaded":7,"active":15}},{"type":"dual","label":"B07 barrido lento","layer":4,"clip":9,"name":"","layer2":5,"clip2":8,"name2":"","color":37,"led":{"empty":0,"loaded":7,"active":15}},{"type":"dual","label":"B11 anillos","layer":4,"clip":13,"name":"","layer2":5,"clip2":12,"name2":"","color":37,"led":{"empty":0,"loaded":7,"active":15}},{"type":"dual","label":"B08 barrido rápido","layer":4,"clip":10,"name":"","layer2":5,"clip2":9,"name2":"","color":37,"led":{"empty":0,"loaded":7,"active":15}},{"type":"dual","label":"B13 destellos","layer":4,"clip":11,"name":"","layer2":5,"clip2":14,"name2":"","color":37,"led":{"empty":0,"loaded":7,"active":15}},{"type":"dual","label":"B01 negras (completo)","layer":4,"clip":3,"name":"","layer2":5,"clip2":2,"name2":"","color":13,"led":{"empty":0,"loaded":7,"active":15}},{"type":"dual","label":"B06 alterno","layer":4,"clip":8,"name":"","layer2":5,"clip2":7,"name2":"","color":5,"led":{"empty":0,"loaded":7,"active":15}},{"type":"dual","label":"B04 random","layer":4,"clip":6,"name":"","layer2":5,"clip2":5,"name2":"","color":13,"led":{"empty":0,"loaded":7,"active":15}},{"type":"dual","label":"B05 random rápido","layer":4,"clip":7,"name":"","layer2":5,"clip2":6,"name2":"","color":13,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 9","layer":1,"clip":9,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 10","layer":1,"clip":10,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 11","layer":1,"clip":11,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 12","layer":1,"clip":12,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 13","layer":1,"clip":13,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 14","layer":1,"clip":14,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 15","layer":1,"clip":15,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 16","layer":1,"clip":16,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 1","layer":1,"clip":1,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 2","layer":1,"clip":2,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 3","layer":1,"clip":3,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 4","layer":1,"clip":4,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 5","layer":1,"clip":5,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 6","layer":1,"clip":6,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 7","layer":1,"clip":7,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Visuales 8","layer":1,"clip":8,"name":"","color":21,"led":{"empty":0,"loaded":7,"active":15}},{"type":"clip","label":"Cegado blanco","layer":2,"clip":9,"name":"","color":3,"led":{"empty":3,"loaded":3,"active":7}},{"type":"clip","label":"Cegado rojo","layer":2,"clip":10,"name":"","color":5,"led":{"empty":3,"loaded":3,"active":7}},{"type":"clip","label":"Cegado naranja","layer":2,"clip":11,"name":"","color":9,"led":{"empty":3,"loaded":3,"active":7}},{"type":"clip","label":"Cegado amarillo","layer":2,"clip":12,"name":"","color":13,"led":{"empty":3,"loaded":3,"active":7}},{"type":"clip","label":"Cegado verde","layer":2,"clip":13,"name":"","color":21,"led":{"empty":3,"loaded":3,"active":7}},{"type":"clip","label":"Cegado cian","layer":2,"clip":14,"name":"","color":37,"led":{"empty":3,"loaded":3,"active":7}},{"type":"clip","label":"Cegado azul","layer":2,"clip":15,"name":"","color":45,"led":{"empty":3,"loaded":3,"active":7}},{"type":"clip","label":"Cegado magenta","layer":2,"clip":16,"name":"","color":53,"led":{"empty":3,"loaded":3,"active":7}},{"type":"clip","label":"Strobo blanco","layer":2,"clip":1,"name":"","color":3,"led":{"empty":10,"loaded":10,"active":7}},{"type":"clip","label":"Strobo rojo","layer":2,"clip":2,"name":"","color":5,"led":{"empty":10,"loaded":10,"active":7}},{"type":"clip","label":"Strobo naranja","layer":2,"clip":3,"name":"","color":9,"led":{"empty":10,"loaded":10,"active":7}},{"type":"clip","label":"Strobo amarillo","layer":2,"clip":4,"name":"","color":13,"led":{"empty":10,"loaded":10,"active":7}},{"type":"clip","label":"Strobo verde","layer":2,"clip":5,"name":"","color":21,"led":{"empty":10,"loaded":10,"active":7}},{"type":"clip","label":"Strobo cian","layer":2,"clip":6,"name":"","color":37,"led":{"empty":10,"loaded":10,"active":7}},{"type":"clip","label":"Strobo azul","layer":2,"clip":7,"name":"","color":45,"led":{"empty":10,"loaded":10,"active":7}},{"type":"clip","label":"Strobo magenta","layer":2,"clip":8,"name":"","color":53,"led":{"empty":10,"loaded":10,"active":7}}],"bottom":[{"type":"bypass","label":"Bypass Visuales","layers":[1],"led":{"idle":0,"active":2}},{"type":"bypass","label":"Bypass Outline","layers":[3],"led":{"idle":0,"active":2}},{"type":"bypass","label":"Bypass Strobos","layers":[2],"led":{"idle":0,"active":2}},{"type":"bypass","label":"Bypass Pixel","layers":[4],"led":{"idle":0,"active":2}},{"type":"bypass","label":"Bypass Madrix","layers":[5],"led":{"idle":0,"active":2}},{"type":"none","label":"","led":{"idle":0,"active":0}},{"type":"prev","label":"Clip anterior de Visuales","layer":1,"led":{"idle":0,"active":1}},{"type":"next","label":"Clip siguiente de Visuales","layer":1,"led":{"idle":0,"active":1}}],"side":[{"type":"clearAll","label":"Limpiar todo","led":{"idle":0,"active":1}},{"type":"clear","label":"Limpiar Strobos","layers":[2],"led":{"idle":0,"active":1}},{"type":"blackout","label":"Blackout","led":{"idle":0,"active":2}},{"type":"clear","label":"Limpiar Visuales","layers":[1],"led":{"idle":0,"active":1}},{"type":"clear","label":"Limpiar Outline","layers":[3],"led":{"idle":0,"active":1}},{"type":"clear","label":"Limpiar Pixel + Madrix","layers":[4,5],"led":{"idle":0,"active":1}},{"type":"none","label":"","led":{"idle":0,"active":0}},{"type":"refresh","label":"Refrescar LEDs","led":{"idle":0,"active":1}}],"shift":{"type":"refresh","label":"Refrescar LEDs","led":{"idle":0,"active":0}},"faders":[{"type":"layerOpacity","label":"Visuales","layer":1},{"type":"layerOpacity","label":"Outline","layer":3},{"type":"layerOpacity","label":"Pixel","layer":4},{"type":"layerOpacity","label":"Madrix","layer":5},{"type":"none","label":""},{"type":"none","label":""},{"type":"clipSpeed","label":"Velocidad Outline clip 10","layer":3,"clip":10,"min":0.25,"max":4,"name":""},{"type":"layerMaster","label":"Master Strobos","layer":2},{"type":"compMaster","label":"Master composición"}],"devices":[],"links":[],"options":{"tempoSync":true,"pollHz":1,"repaintEvery":5,"rgbHz":5,"speedMethod":"put","autoReload":true,"debug":false}}; // mapa incluido: "Deseo54 - DMST DESEO 54 PLANTILLAS"
 
 var cfg = null;
 var cfgText = "";
@@ -23,12 +28,13 @@ var TRACK_FIRST = 100;
 var SCENE_FIRST = 112;
 var SHIFT = 122;
 
-var state = [];
-for (var i = 0; i < 64; i++) state.push(-1); // -1 = aún sin estado
+var devices = [];   // [{id, d: mapa del APC, state: [64]}]
+var pollList = [];  // "L/C" de los clips que hay que preguntar a Resolume
+var linkVals = [];  // por enlace: estado de cada clip de su rango (-1 = aún sin estado)
+var linkOn = [];    // por enlace: 1 = sus acciones están mandadas
+var warnedTargets = [];
 var ticks = 0;
 var lastBpm = 0;
-
-function apc() { return root.modules.apc; }
 
 // ---------- mapa ----------
 
@@ -44,6 +50,7 @@ function loadConfig() {
 		if (c && c.pads && c.pads.length == 64) {
 			cfg = c;
 			script.log("Mapa cargado: " + p + " (" + cfg.name + ")");
+			prepare();
 			return true;
 		}
 		script.logWarning("No se pudo leer " + p + " (¿JSON roto?). Sigo con el mapa anterior.");
@@ -51,6 +58,7 @@ function loadConfig() {
 	if (!cfg && EMBEDDED_CONFIG) {
 		cfg = EMBEDDED_CONFIG;
 		script.log("No hay " + CONFIG_FILE + ": uso el mapa incluido en el script (" + cfg.name + ")");
+		prepare();
 		return true;
 	}
 	if (!cfg) script.logError("No hay mapa: falta " + p);
@@ -62,12 +70,47 @@ function opt(name, def) {
 	return def;
 }
 
-function defFor(note) {
-	if (!cfg) return null;
-	if (note >= 0 && note <= 63) return cfg.pads[note];
-	if (note >= TRACK_FIRST && note < TRACK_FIRST + 8) return cfg.bottom[note - TRACK_FIRST];
-	if (note >= SCENE_FIRST && note < SCENE_FIRST + 8) return cfg.side[note - SCENE_FIRST];
-	if (note == SHIFT) return cfg.shift;
+function addPoll(layer, clip) {
+	var k = layer + "/" + clip;
+	for (var i = 0; i < pollList.length; i++) if (pollList[i] == k) return;
+	pollList.push(k);
+}
+
+// Lista de APC, clips a sondear y estado de los enlaces a partir del mapa
+function prepare() {
+	var i, j, p, d, st;
+	devices = [];
+	var list = [{ id: "apc", d: cfg }];
+	if (cfg.devices) for (i = 0; i < cfg.devices.length; i++) list.push({ id: cfg.devices[i].id, d: cfg.devices[i] });
+	pollList = [];
+	for (i = 0; i < list.length; i++) {
+		st = [];
+		for (p = 0; p < 64; p++) st.push(-1);
+		devices.push({ id: list[i].id, d: list[i].d, state: st });
+		for (p = 0; p < 64; p++) {
+			d = list[i].d.pads[p];
+			if (d.type == "clip" || d.type == "dual") addPoll(d.layer, d.clip);
+		}
+	}
+	linkVals = [];
+	linkOn = [];
+	var links = cfg.links || [];
+	for (i = 0; i < links.length; i++) {
+		var vals = [];
+		for (j = links[i].from; j <= links[i].to; j++) { vals.push(-1); addPoll(links[i].layer, j); }
+		linkVals.push(vals);
+		linkOn.push(0);
+	}
+}
+
+function module(id) { return root.modules[id]; }
+
+function defFor(dv, note) {
+	var d = dv.d;
+	if (note >= 0 && note <= 63) return d.pads[note];
+	if (note >= TRACK_FIRST && note < TRACK_FIRST + 8) return d.bottom[note - TRACK_FIRST];
+	if (note >= SCENE_FIRST && note < SCENE_FIRST + 8) return d.side[note - SCENE_FIRST];
+	if (note == SHIFT) return d.shift;
 	return null;
 }
 
@@ -79,15 +122,56 @@ function noteAt(k) {
 	return SHIFT;
 }
 
-function ctlLed(note, d, on) {
+function ctlLed(dv, note, d, on) {
+	var m = module(dv.id);
+	if (!m || d.feedback) return;
 	if (note <= 63) {
 		var ch = on ? d.led.active : d.led.loaded;
-		if (!ch) apc().sendNoteOn(1, note, 0);
-		else apc().sendNoteOn(ch, note, d.color);
+		if (!ch) m.sendNoteOn(1, note, 0);
+		else m.sendNoteOn(ch, note, d.color);
 		return;
 	}
 	if (note == SHIFT) return;
-	apc().sendNoteOn(1, note, on ? d.led.active : d.led.idle);
+	m.sendNoteOn(1, note, on ? d.led.active : d.led.idle);
+}
+
+// ---------- acciones de los enlaces ----------
+
+function target(id) {
+	if (!id || id == "resolume") return local;
+	var m = root.modules[id];
+	if (!m) {
+		for (var i = 0; i < warnedTargets.length; i++) if (warnedTargets[i] == id) return m;
+		warnedTargets.push(id);
+		script.logError("No existe el módulo \"" + id + "\" en Chataigne (lo usa un enlace del mapa).");
+	}
+	return m;
+}
+
+function sendOut(a, on) {
+	var m = target(a.target);
+	if (!m) return;
+	if (a.type == "osc") { m.send(a.address, on ? a.value : 0); return; }
+	if (a.msg == "cc") m.sendCC(a.channel, a.number, on ? a.value : 0);
+	else if (a.msg == "pc") { if (on) m.sendProgramChange(a.channel, a.number); }
+	else if (on) m.sendNoteOn(a.channel, a.number, a.value);
+	else m.sendNoteOff(a.channel, a.number);
+}
+
+function updateLinks(layer, clip, v) {
+	var links = cfg.links || [];
+	for (var i = 0; i < links.length; i++) {
+		var l = links[i];
+		if (l.layer != layer || clip < l.from || clip > l.to) continue;
+		linkVals[i][clip - l.from] = v;
+		var active = 0;
+		for (var j = 0; j < linkVals[i].length; j++) if (linkVals[i][j] >= 3) active = 1;
+		if (active == linkOn[i]) continue;
+		linkOn[i] = active;
+		if (l.enabled === false) continue;
+		if (opt("debug", false)) script.log("enlace " + (i + 1) + (active ? " activado" : " desactivado"));
+		for (var k = 0; k < l.actions.length; k++) sendOut(l.actions[k], active);
+	}
 }
 
 // ---------- callbacks ----------
@@ -102,10 +186,12 @@ function init() {
 // se encienden ya, sin esperar a Resolume.
 function paintInitial() {
 	if (!cfg) return;
-	for (var p = 0; p < 64; p++) {
-		state[p] = -1;
-		var d = cfg.pads[p];
-		if ((d.type == "clip" || d.type == "dual") && d.led.empty) drawPad(p, 0);
+	for (var i = 0; i < devices.length; i++) {
+		for (var p = 0; p < 64; p++) {
+			devices[i].state[p] = -1;
+			var d = devices[i].d.pads[p];
+			if ((d.type == "clip" || d.type == "dual") && d.led.empty) drawPad(devices[i], p, 0);
+		}
 	}
 }
 
@@ -120,7 +206,7 @@ function update(deltaTime) {
 		}
 	}
 
-	// Tempo: se pregunta a Resolume y se pasa al módulo MIDI del APC, que le manda reloj
+	// Tempo: se pregunta a Resolume y se pasa a los módulos MIDI de los APC, que les mandan reloj
 	// MIDI; así los parpadeos y pulsos del APC van al BPM.
 	if (opt("tempoSync", true)) local.send("/composition/tempocontroller/tempo", "?");
 
@@ -128,14 +214,13 @@ function update(deltaTime) {
 	ticks++;
 	if (ticks >= opt("repaintEvery", 5)) {
 		ticks = 0;
-		for (var s = 0; s < 64; s++) state[s] = -1;
+		for (var i = 0; i < devices.length; i++) for (var s = 0; s < 64; s++) devices[i].state[s] = -1;
 	}
 
-	// se vuelve a pedir el estado de todos los clips del APC por si se pierde algún cambio
-	for (var p = 0; p < 64; p++) {
-		var d = cfg.pads[p];
-		if (d.type == "clip" || d.type == "dual")
-			local.send("/composition/layers/" + d.layer + "/clips/" + d.clip + "/connected", "?");
+	// se vuelve a pedir el estado de todos los clips del mapa por si se pierde algún cambio
+	for (var k = 0; k < pollList.length; k++) {
+		var lc = pollList[k].split("/");
+		local.send("/composition/layers/" + lc[0] + "/clips/" + lc[1] + "/connected", "?");
 	}
 }
 
@@ -143,14 +228,18 @@ function setTempo(value) {
 	var bpm = value <= 1 ? 20 + value * 480 : value; // Resolume lo manda normalizado 20-500
 	if (Math.abs(bpm - lastBpm) < 0.05) return;
 	lastBpm = bpm;
-	var t = apc().values.tempo;
-	t.bpm.set(bpm);
-	if (!t.sendClock.get()) t.sendClock.set(true);
+	for (var i = 0; i < devices.length; i++) {
+		var m = module(devices[i].id);
+		if (!m) continue;
+		var t = m.values.tempo;
+		t.bpm.set(bpm);
+		if (!t.sendClock.get()) t.sendClock.set(true);
+	}
 }
 
 function oscEvent(address, args) {
 	if (!cfg) return;
-	var k, n, d, b;
+	var i, k, n, d;
 
 	if (address == "/composition/tempocontroller/tempo" && args.length > 0) {
 		if (opt("tempoSync", true)) setTempo(parseFloat(args[0]));
@@ -160,10 +249,12 @@ function oscEvent(address, args) {
 	// /composition/bypassed -> LED de los controles de blackout
 	if (address == "/composition/bypassed" && args.length > 0) {
 		var bo = parseInt(args[0]) ? 1 : 0;
-		for (k = 0; k < 81; k++) {
-			n = noteAt(k);
-			d = defFor(n);
-			if (d.type == "blackout") ctlLed(n, d, bo);
+		for (i = 0; i < devices.length; i++) {
+			for (k = 0; k < 81; k++) {
+				n = noteAt(k);
+				d = defFor(devices[i], n);
+				if (d.type == "blackout") ctlLed(devices[i], n, d, bo);
+			}
 		}
 		return;
 	}
@@ -174,10 +265,12 @@ function oscEvent(address, args) {
 	if (parts.length == 5 && parts[2] == "layers" && parts[4] == "bypassed" && args.length > 0) {
 		var bl = parseInt(parts[3]);
 		var on = parseInt(args[0]) ? 1 : 0;
-		for (k = 0; k < 81; k++) {
-			n = noteAt(k);
-			d = defFor(n);
-			if (d.type == "bypass" && d.layers[0] == bl) ctlLed(n, d, on);
+		for (i = 0; i < devices.length; i++) {
+			for (k = 0; k < 81; k++) {
+				n = noteAt(k);
+				d = defFor(devices[i], n);
+				if (d.type == "bypass" && d.layers[0] == bl) ctlLed(devices[i], n, d, on);
+			}
 		}
 		return;
 	}
@@ -191,19 +284,25 @@ function oscEvent(address, args) {
 	var clip = parseInt(parts[5]);
 	var v = parseInt(args[0]);
 
-	for (var p = 0; p < 64; p++) {
-		d = cfg.pads[p];
-		if (d.type != "clip" && d.type != "dual") continue;
-		if (d.layer != layer || d.clip != clip) continue;
-		if (state[p] == v) continue; // sin cambios (llega cada segundo por el sondeo)
-		state[p] = v;
-		drawPad(p, v);
+	for (i = 0; i < devices.length; i++) {
+		var dv = devices[i];
+		for (var p = 0; p < 64; p++) {
+			d = dv.d.pads[p];
+			if (d.type != "clip" && d.type != "dual") continue;
+			if (d.layer != layer || d.clip != clip) continue;
+			if (dv.state[p] == v) continue; // sin cambios (llega cada segundo por el sondeo)
+			dv.state[p] = v;
+			drawPad(dv, p, v);
+		}
 	}
+	updateLinks(layer, clip, v);
 }
 
-function drawPad(pad, v) {
-	var d = cfg.pads[pad];
+function drawPad(dv, pad, v) {
+	var m = module(dv.id);
+	if (!m) return;
+	var d = dv.d.pads[pad];
 	var ch = v <= 0 ? d.led.empty : (v <= 2 ? d.led.loaded : d.led.active);
-	if (!ch) apc().sendNoteOn(1, pad, 0);
-	else apc().sendNoteOn(ch, pad, d.color);
+	if (!ch) m.sendNoteOn(1, pad, 0);
+	else m.sendNoteOn(ch, pad, d.color);
 }

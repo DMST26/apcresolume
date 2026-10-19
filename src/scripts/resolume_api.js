@@ -25,7 +25,6 @@ var reloadTime = 0;
 
 var CH = ["r", "g", "b"];
 
-function apc() { return root.modules.apc; }
 function osc() { return root.modules.resolume; }
 
 // ---------- mapa ----------
@@ -60,10 +59,36 @@ function opt(name, def) {
 	return def;
 }
 
+// Mapas de todos los APC: el principal y los adicionales (cfg.devices)
+function deviceMaps() {
+	var list = [{ id: "apc", d: cfg }];
+	if (cfg.devices) for (var i = 0; i < cfg.devices.length; i++) list.push({ id: cfg.devices[i].id, d: cfg.devices[i] });
+	return list;
+}
+
 function hasRgbPads() {
 	if (!cfg) return false;
-	for (var p = 0; p < 64; p++) if (cfg.pads[p].type == "rgb") return true;
+	var list = deviceMaps();
+	for (var i = 0; i < list.length; i++)
+		for (var p = 0; p < 64; p++) if (list[i].d.pads[p].type == "rgb") return true;
 	return false;
+}
+
+// Pinta los pads R/G/B de todos los APC. vals = [r, g, b] (true = canal activo) o null = clip vacío.
+function paintRgb(vals) {
+	var list = deviceMaps();
+	for (var i = 0; i < list.length; i++) {
+		var m = root.modules[list[i].id];
+		if (!m) continue;
+		for (var p = 0; p < 64; p++) {
+			var d = list[i].d.pads[p];
+			if (d.type != "rgb") continue;
+			var c = d.led.empty;
+			if (vals) for (var j = 0; j < 3; j++) if (CH[j] == d.rgb) c = vals[j] ? d.led.active : d.led.loaded;
+			if (!c) m.sendNoteOn(1, p, 0);
+			else m.sendNoteOn(c, p, d.color);
+		}
+	}
 }
 
 // ---------- callbacks ----------
@@ -93,15 +118,9 @@ function dataEvent(data, url) {
 }
 
 function rgb(data, url) {
-	var p, d;
 	// sin clip cargado en la selección: brillo de "vacío" y no se cambia nada
 	if (!data.video || (data.connected && data.connected.value == "Empty")) {
-		for (p = 0; p < 64; p++) {
-			d = cfg.pads[p];
-			if (d.type != "rgb") continue;
-			if (!d.led.empty) apc().sendNoteOn(1, p, 0);
-			else apc().sendNoteOn(d.led.empty, p, d.color);
-		}
+		paintRgb(null);
 		return;
 	}
 	var v = data.video;
@@ -117,16 +136,7 @@ function rgb(data, url) {
 		}
 	}
 
-	for (p = 0; p < 64; p++) {
-		d = cfg.pads[p];
-		if (d.type != "rgb") continue;
-		for (var j = 0; j < 3; j++) {
-			if (CH[j] != d.rgb) continue;
-			var c = vals[j] ? d.led.active : d.led.loaded;
-			if (!c) apc().sendNoteOn(1, p, 0);
-			else apc().sendNoteOn(c, p, d.color);
-		}
-	}
+	paintRgb(vals);
 }
 
 function stepClip(data, url) {

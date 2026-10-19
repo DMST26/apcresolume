@@ -1072,6 +1072,8 @@
    "label": "Master composición"
   }
  ],
+ "devices": [],
+ "links": [],
  "options": {
   "tempoSync": true,
   "pollHz": 1,

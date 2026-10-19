@@ -12,7 +12,7 @@ function createRig(opts) {
 	var files = opts.files || {};
 
 	function mod(name, extra) {
-		var m = { _name: name };
+		var m = { _name: name, name: name };
 		for (var k in extra) m[k] = extra[k];
 		return m;
 	}
@@ -37,6 +37,14 @@ function createRig(opts) {
 	};
 	if (opts.withWs !== false) modules.resolumews = mod("resolumews", {
 		send: function (msg) { out.push("ws " + msg); }
+	});
+
+	// APC adicionales: ["apc2"] -> módulos MIDI que apuntan "apc2:midi canal nota velocity"
+	(opts.devices || []).forEach(function (id) {
+		modules[id] = mod(id, {
+			sendNoteOn: function (ch, pitch, vel) { out.push(id + ":midi " + ch + " " + pitch + " " + vel); },
+			values: { tempo: { bpm: { set: function () {}, get: function () { return 120; } }, sendClock: { set: function () {}, get: function () { return true; } } } }
+		});
 	});
 
 	// destinos extra: {sunlite: "midi", luces: "osc"}
