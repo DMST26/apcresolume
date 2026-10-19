@@ -162,6 +162,22 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 		const [dl] = await Promise.all([b.waitForEvent("download"), b.click("#exDownload")]);
 		const out = path.join(ROOT, "tests", "e2e", "remote-exportado.html");
 		await dl.saveAs(out);
+		// TouchOSC: el ZIP trae el .tosc (XML con zlib), touchosc.json y touchosc.js
+		const [dlt] = await Promise.all([b.waitForEvent("download"), b.click("#exTosc")]);
+		const zt = path.join(ROOT, "tests", "e2e", "touchosc.zip");
+		await dlt.saveAs(zt);
+		const zbuf = fs.readFileSync(zt);
+		fs.unlinkSync(zt);
+		const entries = {};
+		for (let pos = 0; zbuf.readUInt32LE(pos) == 0x04034b50;) {
+			const nlen = zbuf.readUInt16LE(pos + 26), size = zbuf.readUInt32LE(pos + 18);
+			entries[zbuf.slice(pos + 30, pos + 30 + nlen).toString()] = zbuf.slice(pos + 30 + nlen, pos + 30 + nlen + size);
+			pos += 30 + nlen + size;
+		}
+		const toscName = Object.keys(entries).filter((n) => /\.tosc$/.test(n))[0];
+		let toscXml = "";
+		try { toscXml = require("zlib").inflateSync(entries[toscName]).toString(); } catch (e) { toscXml = ""; }
+		ok("constructor: exportar a TouchOSC", toscName && /^<\?xml version='1.0' encoding='UTF-8'\?><lexml version='3'>/.test(toscXml) && entries["touchosc.json"] && entries["touchosc.js"], Object.keys(entries).join(", "));
 		await b.click("#exClose");
 		ok("constructor: exportar remote", fs.readFileSync(out, "utf8").indexOf('"format":"resolume-remote"') > 0);
 		ok("constructor: sin errores de JavaScript", berr.length == 0, berr.join(" | "));

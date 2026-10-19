@@ -60,11 +60,12 @@ let html = fill(read(SRC, "app", "configurador.html"), {
 	"/*@@CHATAIGNE@@*/": chataigneJs,
 	"/*@@SIM@@*/": inline(read(SRC, "remote", "sim.js"), "sim.js"),
 	"/*@@LAYOUTJS@@*/": inline(read(SRC, "remote", "layout.js"), "layout.js"),
+	"/*@@TOUCHOSC@@*/": inline(read(SRC, "remote", "touchosc.js"), "touchosc.js"),
 	"/*@@RUNTIME@@*/": runtimeJs,
 	"/*@@BUILDER@@*/": inline(read(SRC, "app", "remote_builder.js"), "remote_builder.js"),
 	"/*@@APP@@*/": inline(read(SRC, "app", "app.js"), "app.js")
 }, "configurador.html");
-html = fill(html, { "/*@@DATA@@*/null": json({ defaultConfig: config, scripts: scripts, noisette: noisette, remoteTemplate: remoteTemplate }) }, "configurador.html");
+html = fill(html, { "/*@@DATA@@*/null": json({ defaultConfig: config, scripts: scripts, noisette: noisette, remoteTemplate: remoteTemplate, touchoscScript: read(SRC, "scripts", "touchosc.js") }) }, "configurador.html");
 fs.writeFileSync(path.join(ROOT, "configurador.html"), html);
 
 // ---------- chataigne/ ----------
@@ -73,6 +74,8 @@ const out = path.join(ROOT, "chataigne");
 fs.mkdirSync(out, { recursive: true });
 const files = G.buildFiles(config, scripts, noisette, { noisette: true, folder: "D:/VISUALES/Jungle Tribal/chataigne" });
 files.forEach((f) => fs.writeFileSync(path.join(out, f.name), f.text));
+// script de TouchOSC (no lleva mapa dentro: lee touchosc.json, que se exporta con cada diseño)
+fs.writeFileSync(path.join(out, "touchosc.js"), read(SRC, "scripts", "touchosc.js"));
 
 // ---------- remote de ejemplo ----------
 

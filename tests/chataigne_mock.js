@@ -62,6 +62,8 @@ function createRig(opts) {
 	function fmt(v) { return typeof v == "number" ? String(Math.round(v * 10000) / 10000) : JSON.stringify(v); }
 
 	var root = { modules: modules };
+	// otras partes del proyecto (customVariables, states...) para las pruebas
+	Object.keys(opts.root || {}).forEach(function (k) { root[k] = opts.root[k]; });
 	var util = {
 		fileExists: function (p) { return Object.prototype.hasOwnProperty.call(files, norm(p)); },
 		readFile: function (p, asJson) {

@@ -57,6 +57,7 @@ A partir de ahí, para cambiar el mapa basta con editarlo y volver a guardar. Ch
 | `chataigne/apc_config.json` | El mapa: qué hace cada control. Es lo único que cambia en el día a día. |
 | `chataigne/apc_to_resolume.js` | Script de cada APC (módulos MIDI `apc`, `apc2`…): lo que pulsas sale hacia Resolume y los demás destinos. |
 | `chataigne/resolume_to_apc.js` | Script del módulo OSC `resolume`: pinta los LEDs de todos los APC según el estado de los clips, sincroniza el tempo y ejecuta los **enlaces**. |
+| `chataigne/touchosc.js` | Script del módulo `touchosc` (tablet con TouchOSC); va con el `touchosc.json` de cada diseño. |
 | `chataigne/destino_a_apc.js` | Script de los módulos de destino (p. ej. `sunlite`): enciende los LEDs según lo que devuelve ese programa. |
 | `chataigne/resolume_api.js` | Script del módulo HTTP `resolumeapi`: R/G/B del clip seleccionado, clip anterior/siguiente y velocidad por WebSocket. |
 | `src/` | Código fuente (ver [Desarrollo](#desarrollo)). |
@@ -366,6 +367,39 @@ En un mismo remote puedes mezclar controles de Resolume y de Chataigne.
 
 > **Alternativa sin el configurador:** Chataigne tiene su propio **Dashboard**, una página web en el puerto de *Project Settings → Dashboard*, normalmente el 9999. Ahí también puedes arrastrar parámetros y abrirlo desde la tablet. Lo que hace este constructor es darte, en un solo archivo, controles pensados para tocar con el dedo, un asistente, Resolume y Chataigne en el mismo remote, y miniaturas de clips.
 
+### TouchOSC
+
+El mismo remote que diseñas en el constructor se puede llevar a **TouchOSC** (la app de Hexler). En **Exportar remote**, pulsa **Descargar para TouchOSC (.zip)**. Dentro vienen:
+
+| Archivo | Para qué |
+|---|---|
+| `<nombre>.tosc` | La plantilla para TouchOSC, con las mismas páginas y controles. Después puedes retocarla en el editor de TouchOSC. |
+| `touchosc.js` | Script del módulo «touchosc» de Chataigne. |
+| `touchosc.json` | Qué parámetros de Chataigne usa la plantilla. Va junto al script. |
+| `LEEME_TouchOSC.txt` | Estos mismos pasos. |
+
+En TouchOSC, la tablet habla con **Chataigne**, no directamente con Resolume. Así un mismo botón puede ir a Resolume, a Sunlite o a una variable, y la tablet recibe el estado.
+
+**Montarlo:**
+1. Copia `touchosc.js` y `touchosc.json` en la carpeta de los scripts de Chataigne.
+2. En Chataigne, crea un módulo **OSC** llamado exactamente **`touchosc`**:
+   - entrada en el puerto **9000**;
+   - salida a la **IP de la tablet**, puerto **9001**;
+   - script `touchosc.js`.
+3. En TouchOSC, en *Connections → OSC → Connection 1*: UDP, host = IP del PC de Chataigne, envío al puerto **9000**, recepción en el **9001**.
+4. Exporta también los scripts del APC (modo APC → Exportar): `resolume_to_apc.js` es el que pasa a la tablet el estado de Resolume.
+
+**Cómo viajan los mensajes:**
+- Lo que va a Resolume usa sus **direcciones OSC** (`/composition/layers/1/video/opacity`, `/composition/layers/1/clips/3/connect`…). Chataigne lo reenvía por el módulo `resolume`.
+- Lanzar clip o columna, vaciar y seleccionar solo cuentan al pulsar.
+- Lo de Chataigne va como `/chataigne/<ruta>`, por ejemplo `/chataigne/customVariables/show/variables/intensidad`. Los selectores mandan el número de opción y el script lo convierte en su nombre.
+- Hacia la tablet:
+  - los clips que suenan se encienden (Chataigne pregunta su estado cada segundo);
+  - los valores que cambia Resolume llegan tal cual;
+  - los de Chataigne se mandan cuando cambian.
+
+> **Sin probar en TouchOSC de verdad.** El `.tosc` se genera con el formato de los archivos guardados por TouchOSC, gracias al proyecto libre [tosclib](https://github.com/AlbertoV5/tosclib), y se comprueba que es XML válido con esa estructura, pero no se ha abierto en la app. Las direcciones OSC de los **efectos** siguen lo que cuenta el [foro de Resolume](https://resolume.com/forum/viewtopic.php?p=66591) (`…/effects/<efecto>/effect/<parámetro>`). Si alguna no responde, cópiala en el editor de TouchOSC desde Resolume (*Shortcuts → Edit OSC*), como explica su [guía de OSC](https://resolume.com/article/44).
+
 ### Cómo habla con Resolume
 
 Usa la API oficial de WebSocket (`ws://IP:8080/api/v1`), como el ejemplo oficial de Resolume:
@@ -500,6 +534,7 @@ Si el clip pasa a ir al doble de velocidad, el método PUT funciona.
    - que en el modo **Con Resolume** se lanzan clips y se mueven los faders;
    - que el remote se abre desde la **Root Directory** en la tablet.
 7. **Remote con Chataigne 1.10.4:** activa OSC Remote Control y comprueba en el constructor que **Leer de Chataigne** trae tus módulos, y que un fader de una variable personalizada la mueve en Chataigne.
+8. **TouchOSC:** abre el `.tosc` exportado en la app y comprueba páginas, faders y botones, que un clip se lanza y se ilumina, y que un fader de Chataigne mueve su variable.
 
 ---
 
@@ -660,6 +695,7 @@ Las pruebas no necesitan Chataigne ni Resolume: simulan el entorno de scripts de
   - el catálogo de parámetros (efectos por nombre, nombres repetidos, parámetros con espacios);
   - el paso de rutas a ids y las acciones por id;
   - el simulador, la revisión del asistente y el generador de remotes.
+- **`touchosc.test.js`** prueba las direcciones OSC, que el `.tosc` sea XML válido con la estructura de TouchOSC, el script `touchosc.js` (Resolume, variables, selectores, pulsadores y vuelta a la tablet) y el reenvío del estado de Resolume.
 - **`e2e/apc.e2e.js`** prueba en Chromium varios APC, el LED según Sunlite, el enlace del cegado y la exportación.
 - **`e2e/remote.e2e.js`** prueba en Chromium el remote exportado y el constructor contra el Resolume de mentira.
 - **`check_chataigne_syntax.js`** comprueba que los scripts no usan nada que el motor JavaScript de Chataigne (JUCE) no entienda: `let`, `const`, funciones flecha, expresiones regulares, `switch`, métodos modernos de array…

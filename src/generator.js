@@ -477,7 +477,7 @@
 		return files;
 	};
 
-	// ZIP sin compresión (suficiente para unos pocos archivos de texto)
+	// ZIP sin compresión (suficiente para unos pocos archivos). Cada archivo: {name, text} o {name, bytes}
 	var CRC_TABLE = null;
 	function crc32(bytes) {
 		if (!CRC_TABLE) {
@@ -503,7 +503,7 @@
 		var date = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
 		function hdr(size) { return { b: new Uint8Array(size), v: null }; }
 		files.forEach(function (f) {
-			var name = utf8(f.name), data = utf8(f.text), crc = crc32(data);
+			var name = utf8(f.name), data = f.bytes || utf8(f.text), crc = crc32(data);
 			var h = hdr(30 + name.length), v = new DataView(h.b.buffer);
 			v.setUint32(0, 0x04034b50, true); v.setUint16(4, 20, true); v.setUint16(6, 0x0800, true);
 			v.setUint16(8, 0, true); v.setUint16(10, time, true); v.setUint16(12, date, true);

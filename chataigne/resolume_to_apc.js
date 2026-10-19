@@ -15,6 +15,8 @@
 // a otros programas (p. ej. blackout de Sunlite mientras suena un cegado) y al dejar de sonar se
 // mandan "apagadas" (0, note off).
 //
+// TOUCHOSC: si existe el módulo "touchosc", también se le pasa lo que manda Resolume.
+//
 // Generado por el configurador APC mini mk2 <-> Resolume.
 
 var CONFIG_FILE = "apc_config.json";
@@ -237,7 +239,23 @@ function setTempo(value) {
 	}
 }
 
+// Si hay una tablet con TouchOSC (módulo "touchosc"), se le pasa lo que manda Resolume. El estado de
+// un clip (connected: 0-4) va como 1 = sonando / 0 = no, en la dirección del botón (".../connect").
+function toTouchOSC(address, args) {
+	var t = root.modules.touchosc;
+	if (!t || args.length < 1) return;
+	var parts = address.split("/");
+	var tail = parts[parts.length - 1];
+	if (tail == "connect") return; // el eco del disparo no es el estado
+	if (tail == "connected") {
+		t.send(address.substring(0, address.length - 2), parseInt(args[0]) >= 3 ? 1 : 0);
+		return;
+	}
+	t.send(address, args[0]);
+}
+
 function oscEvent(address, args) {
+	toTouchOSC(address, args);
 	if (!cfg) return;
 	var i, k, n, d;
 

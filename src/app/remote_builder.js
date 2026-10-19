@@ -833,6 +833,10 @@
 			"<li>En la tablet, conectada a la misma wifi: abre <code>http://IP-del-PC:8080/" + esc(file) + "</code>. La IP sale en esa misma pantalla de Resolume.</li>" +
 			"<li>En el navegador de la tablet: «Añadir a pantalla de inicio» para abrirlo a pantalla completa.</li></ol>" +
 			'<p class="hint">También funciona abriendo el archivo en el propio PC (doble clic): se conecta a 127.0.0.1:8080.</p>' +
+			"<h3>TouchOSC</h3>" +
+			'<p class="hint">El mismo diseño como plantilla de <strong>TouchOSC</strong> (.tosc). La tablet habla con <strong>Chataigne</strong>, que lo pasa a Resolume, Sunlite y lo demás, y le devuelve el estado.</p>' +
+			'<div class="row"><button id="exTosc">Descargar para TouchOSC (.zip)</button></div>' +
+			'<div id="exToscWarn"></div>' +
 			"<h3>Diseño</h3>" +
 			'<div class="row"><button id="exSaveJson">Guardar diseño (.json)</button><button id="exOpenJson">Abrir diseño…</button></div>' +
 			'<div class="row" style="margin-top:6px"><select id="exLib">' + (names.length ? names.map((n) => '<option value="' + esc(n) + '"' + (n == layout.name ? " selected" : "") + ">" + esc(n) + "</option>").join("") : '<option value="">(ninguno guardado)</option>') + "</select></div>" +
@@ -852,6 +856,7 @@
 				toast("Guardado «" + fname() + "» en «" + dirHandle.name + "».");
 			} catch (e) { if (e && e.name != "AbortError") toast("No se pudo guardar: " + e.message, true); }
 		};
+		$("exTosc").onclick = exportTouchOSC;
 		$("exSaveJson").onclick = () => APP.download(slug(layout.name) + ".remote.json", new Blob([JSON.stringify(layout, null, 1)], { type: "application/json" }));
 		$("exOpenJson").onclick = () => $("exFileIn").click();
 		$("exFileIn").onchange = (e) => {
@@ -876,6 +881,50 @@
 		$("exLibDel").onclick = () => { const n = $("exLib").value; if (n && confirm("¿Borrar «" + n + "» del navegador?")) { const l = store.get("remotes", {}); delete l[n]; store.set("remotes", l); openExport(); } };
 		$("exClose").onclick = () => dlg.close();
 		if (!dlg.open) dlg.showModal();
+	}
+
+	// .tosc = XML comprimido con zlib ("deflate" en el navegador)
+	async function zlib(text) {
+		const cs = new CompressionStream("deflate");
+		const w = cs.writable.getWriter();
+		w.write(new TextEncoder().encode(text));
+		w.close();
+		return new Uint8Array(await new Response(cs.readable).arrayBuffer());
+	}
+	async function exportTouchOSC() {
+		if (typeof CompressionStream == "undefined") { toast("Este navegador no puede crear el .tosc: usa Chrome o Edge actualizados.", true); return; }
+		const built = window.TouchOSCExport.build(layout, realComp() || composition(), realTree() || chataigneTree(), L.DEVICES);
+		const base = slug(layout.name);
+		const files = [
+			{ name: base + ".tosc", bytes: await zlib(built.xml) },
+			{ name: "touchosc.json", text: window.TouchOSCExport.mapJSON(built, layout) },
+			{ name: "touchosc.js", text: DATA.touchoscScript },
+			{ name: "LEEME_TouchOSC.txt", text: touchReadme(base) }
+		];
+		APP.download(base + "-touchosc.zip", new Blob([window.APCGen.makeZip(files)], { type: "application/zip" }));
+		$("exToscWarn").innerHTML = built.warnings.length ? '<div class="box warn" style="font-size:12px">' + built.warnings.map(esc).join("<br>") + "</div>" : "";
+		toast("TouchOSC: abre " + base + ".tosc en la tablet y pon touchosc.js y touchosc.json en la carpeta de los scripts de Chataigne.");
+	}
+	function touchReadme(base) {
+		return [
+			"TouchOSC + Chataigne",
+			"",
+			"1. Copia touchosc.js y touchosc.json en la carpeta de los scripts de Chataigne.",
+			"2. En Chataigne, crea un módulo OSC llamado exactamente «touchosc»:",
+			"   - OSC Input, Local Port: 9000",
+			"   - OSC Output: IP de la tablet, puerto 9001",
+			"   - Scripts: añade touchosc.js",
+			"3. En la tablet, abre " + base + ".tosc con TouchOSC.",
+			"4. En TouchOSC: Connections -> OSC -> Connection 1: UDP, Host = IP del PC de Chataigne,",
+			"   Send Port 9000, Receive Port 9001.",
+			"5. Los scripts resolume_to_apc.js (estado de Resolume) y touchosc.js tienen que estar al día:",
+			"   exporta los scripts desde el configurador (modo APC -> Exportar).",
+			"",
+			"Lo que va a Resolume usa sus direcciones OSC (/composition/...). Lo de Chataigne (Sunlite,",
+			"variables...) va como /chataigne/<ruta> y touchosc.js lo pasa al parámetro.",
+			"Si una dirección de efecto no responde, cámbiala en el editor de TouchOSC copiándola de",
+			"Resolume (Shortcuts -> Edit OSC)."
+		].join("\r\n") + "\r\n";
 	}
 
 	// ---------- teclado y API para app.js ----------
